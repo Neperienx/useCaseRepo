@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel">
+    <h1>{{ heading }}</h1>
+    <form method="post">
+      {{ form.hidden_tag() }}
+      <div>
+        {{ form.title.label }}
+        {{ form.title() }}
+      </div>
+      <div>
+        {{ form.industry.label }}
+        {{ form.industry() }}
+      </div>
+      <div>
+        {{ form.summary.label }}
+        {{ form.summary(rows=4) }}
+      </div>
+      <div>
+        {{ form.problem.label }}
+        {{ form.problem(rows=4) }}
+      </div>
+      <div>
+        {{ form.solution.label }}
+        {{ form.solution(rows=4) }}
+      </div>
+      <div>
+        {{ form.impact.label }}
+        {{ form.impact(rows=3) }}
+      </div>
+      <div>
+        {{ form.data_source.label }}
+        {{ form.data_source() }}
+      </div>
+      <div>
+        {{ form.tags.label }}
+        {{ form.tags(placeholder="analytics, customer success") }}
+        <p class="muted">Separate tags with commas to power quick filtering.</p>
+      </div>
+      {{ form.submit(class_="button") }}
+    </form>
+  </section>
+{% endblock %}

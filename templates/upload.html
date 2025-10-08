@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel">
+    <h1>Import from Excel</h1>
+    <p class="muted">Upload a spreadsheet with columns such as Title, Summary, Industry, Problem, Solution, Impact, Tags and Data Source.</p>
+    <form method="post" enctype="multipart/form-data">
+      {{ form.hidden_tag() }}
+      <div>
+        {{ form.file.label }}
+        {{ form.file() }}
+      </div>
+      <div>
+        {{ form.import_mode.label }}
+        {{ form.import_mode() }}
+      </div>
+      {{ form.submit(class_="button") }}
+    </form>
+  </section>
+{% endblock %}

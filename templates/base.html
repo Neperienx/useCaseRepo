@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title or app_title }}</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <a href="{{ url_for('dashboard') }}">{{ app_title }}</a>
+      </div>
+      <nav>
+        {% if current_user.is_authenticated %}
+          <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+          {% if current_user.is_admin %}
+            <a class="nav-link" href="{{ url_for('create_use_case') }}">New use case</a>
+            <a class="nav-link" href="{{ url_for('import_excel') }}">Import</a>
+          {% endif %}
+          <a class="button ghost" href="{{ url_for('logout') }}">Sign out</a>
+        {% endif %}
+      </nav>
+    </header>
+
+    <main class="layout">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-container">
+            {% for category, message in messages %}
+              <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+      <p>Built for Python 3.13.7 • {{ now.strftime('%Y') }}</p>
+    </footer>
+  </body>
+</html>
