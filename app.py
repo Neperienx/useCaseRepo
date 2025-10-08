@@ -82,9 +82,6 @@ def create_app() -> Flask:
     return app
 
 
-app = create_app()
-
-
 # ---------------------------------------------------------------------------
 # Database models
 # ---------------------------------------------------------------------------
@@ -424,6 +421,9 @@ def _clean_cell(value) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+app = create_app()
 
 
 if __name__ == "__main__":

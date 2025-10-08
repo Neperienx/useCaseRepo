@@ -26,39 +26,85 @@ industries.
 
 ## 🚀 Getting started
 
-1. **Install dependencies (Python 3.13.7):**
+### 1. Prerequisites
 
-   ```bash
-   python3.13 -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   ```
+- **Python 3.13.7** installed and available on your `PATH`.
+- (Optional) [pipx](https://pypa.github.io/pipx/) or a similar tool if you
+  prefer managing virtual environments automatically.
 
-2. **Initialise the database:**
+You can confirm the interpreter version with:
 
-   ```bash
-   flask --app app init-db
-   ```
+```bash
+python --version
+```
 
-3. **Create an administrator account:**
+If you have multiple Python installations, explicitly call `python3.13` (Unix)
+or `py -3.13` (Windows).
 
-   ```bash
-   flask --app app create-admin your_username
-   # You will be prompted for a password
-   ```
+### 2. Create and activate a virtual environment
 
-4. **Run the development server:**
+```bash
+# macOS / Linux
+python3.13 -m venv .venv
+source .venv/bin/activate
 
-   ```bash
-   flask --app app run --debug
-   ```
+# Windows (PowerShell)
+py -3.13 -m venv .venv
+.venv\Scripts\Activate.ps1
+```
 
-5. **Visit the dashboard:** Open http://127.0.0.1:5000 and sign in with the
-   credentials you created above.
+When the environment is active, your prompt shows `(.venv)`.
+
+### 3. Install dependencies
+
+```bash
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+If the `flask` command is not found afterwards, use `python -m flask` (Unix) or
+`py -m flask` (Windows) as a drop-in replacement in the steps below.
+
+### 4. Initialise the database
+
+```bash
+flask --app app init-db
+```
+
+This creates `instance/use_cases.db`. The folder is generated automatically, so
+no manual directory setup is required.
+
+### 5. Create an administrator account
+
+```bash
+flask --app app create-admin your_username
+# You will be prompted for a password twice
+```
+
+Re-running the command with the same username updates its password and ensures
+the account keeps the `admin` role.
+
+### 6. Start the development server
+
+```bash
+flask --app app run --debug
+```
+
+By default the app listens on http://127.0.0.1:5000. Sign in with the admin
+credentials you created in the previous step.
 
 > ℹ️ To point the app at a different database, set the `DATABASE_URI`
-> environment variable before running the commands above.  Any SQLAlchemy
+> environment variable before running the commands above. Any SQLAlchemy-
 > compatible URI will work (for example, PostgreSQL when you outgrow SQLite).
+
+### 7. Deactivate the environment when finished
+
+```bash
+deactivate
+```
+
+Run `.venv\Scripts\Activate.ps1` (PowerShell) or `source .venv/bin/activate`
+again the next time you work on the project.
 
 ---
 
@@ -89,7 +135,21 @@ flask --app app init-db
 
 # Run the app with a custom secret key
 SECRET_KEY="change-me" flask --app app run
+
+# Windows PowerShell equivalents
+Remove-Item instance/use_cases.db -ErrorAction Ignore
+flask --app app init-db
+${env:SECRET_KEY} = "change-me"; flask --app app run
 ```
+
+> 💡 Troubleshooting tips
+> - `ModuleNotFoundError`: double-check your virtual environment is activated
+>   before running `flask` commands.
+> - `sqlite3.OperationalError: unable to open database file`: ensure you have
+>   write permissions inside the project folder. Running `flask --app app
+>   init-db` creates the `instance/` directory automatically.
+> - To inspect the generated database, use a GUI such as
+>   [SQLite Browser](https://sqlitebrowser.org/) and open `instance/use_cases.db`.
 
 ---
 
