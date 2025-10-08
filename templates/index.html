@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel grid">
+    <header>
+      <h1>Use case overview</h1>
+      <p class="muted">{{ total_records }} records • Filter and explore AI projects tailored to your organisation.</p>
+    </header>
+    <form method="get" class="filters">
+      <div>
+        <label for="search">Search</label>
+        <input type="text" id="search" name="q" value="{{ search }}" placeholder="Find by title, tags or description">
+      </div>
+      <div>
+        <label for="industry">Industry</label>
+        <select id="industry" name="industry">
+          <option value="">All industries</option>
+          {% for option in industries %}
+            <option value="{{ option }}" {% if option == selected_industry %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="actions">
+        <button class="button" type="submit">Apply</button>
+        <a class="button ghost" href="{{ url_for('dashboard') }}">Reset</a>
+      </div>
+    </form>
+  </section>
+
+  {% if use_cases %}
+    <section class="cards">
+      {% for item in use_cases %}
+        <article class="card">
+          <header>
+            <h3><a href="{{ url_for('use_case_detail', use_case_id=item.id) }}">{{ item.title }}</a></h3>
+            {% if item.industry %}<span class="tag">{{ item.industry }}</span>{% endif %}
+          </header>
+          {% if item.summary %}
+            <p>{{ item.summary|truncate(150) }}</p>
+          {% endif %}
+          {% if item.tag_list() %}
+            <div class="tag-list">
+              {% for tag in item.tag_list() %}
+                <span class="tag">{{ tag }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+          {% if current_user.is_admin %}
+            <div class="actions">
+              <a class="button ghost" href="{{ url_for('edit_use_case', use_case_id=item.id) }}">Edit</a>
+              <form action="{{ url_for('delete_use_case', use_case_id=item.id) }}" method="post">
+                <button class="button secondary" type="submit" onclick="return confirm('Delete this record?');">Delete</button>
+              </form>
+            </div>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </section>
+  {% else %}
+    <section class="panel">
+      <h2>No records yet</h2>
+      <p class="muted">Use the “New use case” button to add your first entry or import an Excel file.</p>
+    </section>
+  {% endif %}
+{% endblock %}

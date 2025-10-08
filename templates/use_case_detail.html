@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+  <article class="panel grid">
+    <header>
+      <a class="button ghost" href="{{ url_for('dashboard') }}">← Back</a>
+      <h1>{{ use_case.title }}</h1>
+      {% if use_case.industry %}
+        <span class="tag">{{ use_case.industry }}</span>
+      {% endif %}
+      {% if use_case.tag_list() %}
+        <div class="tag-list">
+          {% for tag in use_case.tag_list() %}
+            <span class="tag">{{ tag }}</span>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </header>
+
+    {% if use_case.summary %}
+      <section>
+        <h2>Summary</h2>
+        <p>{{ use_case.summary }}</p>
+      </section>
+    {% endif %}
+
+    {% if use_case.problem %}
+      <section>
+        <h2>Problem</h2>
+        <p>{{ use_case.problem }}</p>
+      </section>
+    {% endif %}
+
+    {% if use_case.solution %}
+      <section>
+        <h2>Solution</h2>
+        <p>{{ use_case.solution }}</p>
+      </section>
+    {% endif %}
+
+    {% if use_case.impact %}
+      <section>
+        <h2>Impact</h2>
+        <p>{{ use_case.impact }}</p>
+      </section>
+    {% endif %}
+
+    {% if use_case.data_source %}
+      <section>
+        <h2>Data source</h2>
+        <p>{{ use_case.data_source }}</p>
+      </section>
+    {% endif %}
+
+    {% if current_user.is_admin %}
+      <footer class="actions">
+        <a class="button ghost" href="{{ url_for('edit_use_case', use_case_id=use_case.id) }}">Edit</a>
+        <form action="{{ url_for('delete_use_case', use_case_id=use_case.id) }}" method="post">
+          <button class="button secondary" type="submit" onclick="return confirm('Delete this record?');">Delete</button>
+        </form>
+      </footer>
+    {% endif %}
+  </article>
+{% endblock %}

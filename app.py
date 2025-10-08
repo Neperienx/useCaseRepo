@@ -1,294 +1,430 @@
+"""A local-first AI use-case management tool built with Flask.
+
+The application is designed as a weekend-friendly coding exercise: it keeps
+infrastructure light (SQLite by default) while offering an opinionated feature
+set for managing a catalogue of AI projects.  It supports Python 3.13.7 and
+provides an admin-ready web interface for curating records, importing Excel
+spreadsheets and browsing data with filters and full text search.
 """
-A simple Flask web application that demonstrates how to
-upload an Excel file, store its contents in a PostgreSQL
-database and implement very basic role‑based permissions.
-
-This proof‑of‑concept uses Flask, Flask‑SQLAlchemy and
-Flask‑Login.  It defines two roles — `reader` and `admin` —
-to restrict who can upload data or modify it.  Records are
-stored in a single table with a JSON column so that the
-application can cope with arbitrary Excel layouts.
-
-To run this app locally:
-
-1.  Ensure you have a running PostgreSQL database.  You
-    can adjust the database connection string by setting
-    the `DATABASE_URI` environment variable.  The default
-    points at `postgresql://user:password@localhost:5432/mydb`.
-2.  Install dependencies from `requirements.txt`:
-
-        pip install -r requirements.txt
-
-3.  Initialise the database tables by running the script
-    once with the `initdb` argument:
-
-        python app.py initdb
-
-    This creates the tables and, if no users exist, also
-    creates a default administrator account with username
-    `admin` and password `admin`.  Change the password in
-    production!
-4.  Start the development server with:
-
-        python app.py run
-
-5.  Visit http://localhost:5000 in your browser, log in
-    and start uploading Excel files.
-
-This code is intentionally minimal.  It leaves many
-concerns (such as password resets, CSRF protection on
-forms, and input validation) to future iterations.  The
-goal is to provide a working baseline that you can extend
-over the course of a weekend.
-"""
+from __future__ import annotations
 
 import os
-import sys
+from datetime import datetime
+from pathlib import Path
+
+import click
+import pandas as pd
 from flask import (
     Flask,
+    abort,
+    flash,
+    redirect,
     render_template,
     request,
-    redirect,
     url_for,
-    flash,
-    send_from_directory,
 )
-from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager,
-    login_user,
-    login_required,
-    logout_user,
-    current_user,
     UserMixin,
+    current_user,
+    login_required,
+    login_user,
+    logout_user,
 )
-from werkzeug.security import generate_password_hash, check_password_hash
-import pandas as pd
+from flask_sqlalchemy import SQLAlchemy
+from flask_wtf import FlaskForm
+from flask_wtf.file import FileAllowed, FileField, FileRequired
+from sqlalchemy import func, or_
+from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
+from wtforms import PasswordField, SelectField, StringField, SubmitField, TextAreaField
+from wtforms.validators import DataRequired, Length, Optional
 
 # ---------------------------------------------------------------------------
-# Configuration
+# Application factory and extensions
 # ---------------------------------------------------------------------------
 
-app = Flask(__name__)
+db = SQLAlchemy()
+login_manager = LoginManager()
+login_manager.login_view = "login"
 
-# In a production setting you should set the secret key and database
-# connection via environment variables.  Here we provide sensible
-# defaults for a local proof of concept.
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
 
-# Use the DATABASE_URI environment variable if provided; otherwise use
-# a local Postgres database.  The URI format is documented in the
-# SQLAlchemy docs.  See https://vsupalov.com/flask-sqlalchemy-postgres/
-# for details on constructing the URI【649052990375149†L85-L90】.
-default_db = 'postgresql://user:password@localhost:5432/mydb'
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URI', default_db)
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+def create_app() -> Flask:
+    """Create and configure the Flask application instance."""
 
-db = SQLAlchemy(app)
-login_manager = LoginManager(app)
-login_manager.login_view = 'login'
+    app = Flask(__name__, instance_relative_config=True)
+    default_db_path = Path(app.instance_path) / "use_cases.db"
+    app.config.from_mapping(
+        SECRET_KEY=os.getenv("SECRET_KEY", "dev-secret-key"),
+        SQLALCHEMY_DATABASE_URI=os.getenv(
+            "DATABASE_URI", f"sqlite:///{default_db_path}"
+        ),
+        SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        UPLOAD_FOLDER=os.getenv(
+            "UPLOAD_FOLDER", os.path.join(app.instance_path, "uploads")
+        ),
+        MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16 MB upload cap
+    )
+
+    os.makedirs(app.instance_path, exist_ok=True)
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+
+    db.init_app(app)
+    login_manager.init_app(app)
+
+    register_cli_commands(app)
+    register_routes(app)
+
+    @app.context_processor
+    def inject_globals():  # pragma: no cover - simple convenience
+        return {"app_title": "AI Use Case Library", "now": datetime.utcnow()}
+
+    return app
+
+
+app = create_app()
 
 
 # ---------------------------------------------------------------------------
-# Models
+# Database models
 # ---------------------------------------------------------------------------
+
 
 class User(db.Model, UserMixin):
-    """Simple user model with role field.
-
-    The `role` column stores either 'admin' or 'reader'.  In a real
-    application you might use a many‑to‑many relationship to support
-    more complex role hierarchies【174427130110899†L105-L116】.  For this POC
-    we keep it simple.
-    """
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(100), unique=True, nullable=False)
-    password_hash = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(20), nullable=False, default='reader')
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(20), nullable=False, default="reader")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    def set_password(self, password: str) -> None:
-        self.password_hash = generate_password_hash(password)
+    def set_password(self, raw_password: str) -> None:
+        self.password_hash = generate_password_hash(raw_password)
 
-    def check_password(self, password: str) -> bool:
-        return check_password_hash(self.password_hash, password)
+    def check_password(self, raw_password: str) -> bool:
+        return check_password_hash(self.password_hash, raw_password)
 
+    @property
     def is_admin(self) -> bool:
-        return self.role == 'admin'
+        return self.role == "admin"
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging helper
+        return f"<User {self.username}>"
 
 
-class Record(db.Model):
-    """Data imported from Excel.
-
-    Each record stores a single row of the uploaded spreadsheet in
-    JSON format.  Using JSON allows the table to accommodate any
-    column names without altering the schema.  See the pandas
-    integration example for reading Excel files【954885212002298†L189-L225】.
-    """
+class UseCase(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    data = db.Column(db.JSON, nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    industry = db.Column(db.String(120))
+    summary = db.Column(db.Text)
+    problem = db.Column(db.Text)
+    solution = db.Column(db.Text)
+    impact = db.Column(db.Text)
+    data_source = db.Column(db.String(200))
+    tags = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    def tag_list(self) -> list[str]:
+        return [tag.strip() for tag in (self.tags or "").split(",") if tag.strip()]
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<UseCase {self.title}>"
 
 
 # ---------------------------------------------------------------------------
-# User loader for Flask‑Login
+# Forms
 # ---------------------------------------------------------------------------
+
+
+class LoginForm(FlaskForm):
+    username = StringField("Username", validators=[DataRequired(), Length(max=80)])
+    password = PasswordField("Password", validators=[DataRequired()])
+    submit = SubmitField("Sign in")
+
+
+class UseCaseForm(FlaskForm):
+    title = StringField("Title", validators=[DataRequired(), Length(max=200)])
+    industry = StringField("Industry", validators=[Optional(), Length(max=120)])
+    summary = TextAreaField("Summary", validators=[Optional()])
+    problem = TextAreaField("Problem", validators=[Optional()])
+    solution = TextAreaField("Solution", validators=[Optional()])
+    impact = TextAreaField("Impact", validators=[Optional()])
+    data_source = StringField("Data source", validators=[Optional(), Length(max=200)])
+    tags = StringField(
+        "Tags", validators=[Optional(), Length(max=200)],
+        description="Comma-separated labels such as industries or technologies."
+    )
+    submit = SubmitField()
+
+
+class UploadForm(FlaskForm):
+    file = FileField(
+        "Excel file",
+        validators=[
+            FileRequired(message="Choose an Excel file to import."),
+            FileAllowed({"xls", "xlsx"}, "Only .xls or .xlsx files are supported."),
+        ],
+    )
+    import_mode = SelectField(
+        "Import mode",
+        choices=[
+            ("append", "Append to existing records"),
+            ("replace", "Replace existing records"),
+        ],
+        default="append",
+    )
+    submit = SubmitField("Upload")
+
+
+# ---------------------------------------------------------------------------
+# Authentication utilities
+# ---------------------------------------------------------------------------
+
 
 @login_manager.user_loader
-def load_user(user_id):
+def load_user(user_id: str):
     return User.query.get(int(user_id))
 
 
+def require_admin() -> None:
+    if not current_user.is_authenticated or not current_user.is_admin:
+        abort(403)
+
+
 # ---------------------------------------------------------------------------
-# Command‑line helpers
+# CLI commands
 # ---------------------------------------------------------------------------
 
-def init_db() -> None:
-    """Initialise database tables and create a default admin user."""
-    with app.app_context():
-        db.create_all()
-        # If no users exist, create a default admin account
-        if User.query.count() == 0:
-            admin = User(username='admin', role='admin')
-            admin.set_password('admin')
-            db.session.add(admin)
+
+def register_cli_commands(app: Flask) -> None:
+    """Expose helper commands for bootstrapping the application."""
+
+    @app.cli.command("init-db")
+    def init_db_command() -> None:
+        """Create database tables."""
+        with app.app_context():
+            db.create_all()
+        click.echo("Database initialised.")
+
+    @app.cli.command("create-admin")
+    @click.argument("username")
+    @click.option(
+        "--password",
+        prompt=True,
+        hide_input=True,
+        confirmation_prompt=True,
+        help="Password for the administrator account.",
+    )
+    def create_admin_command(username: str, password: str) -> None:
+        """Create or update an administrator account."""
+        with app.app_context():
+            user = User.query.filter_by(username=username).first()
+            if user is None:
+                user = User(username=username, role="admin")
+                db.session.add(user)
+            else:
+                user.role = "admin"
+            user.set_password(password)
             db.session.commit()
-            print(
-                'Initialized the database and created default admin user ' \
-                'with username="admin" and password="admin".  Change the password!'
+        click.echo(f"Admin user '{username}' is ready to log in.")
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+
+def register_routes(app: Flask) -> None:
+    @app.errorhandler(403)
+    def forbidden(_error):  # pragma: no cover - presentation only
+        flash("You need administrator rights to access that action.", "warning")
+        return redirect(url_for("dashboard"))
+
+    @app.route("/")
+    @login_required
+    def dashboard():
+        search = request.args.get("q", "").strip()
+        industry = request.args.get("industry", "").strip()
+
+        query = UseCase.query
+        if search:
+            like = f"%{search.lower()}%"
+            query = query.filter(
+                or_(
+                    func.lower(UseCase.title).like(like),
+                    func.lower(UseCase.summary).like(like),
+                    func.lower(UseCase.problem).like(like),
+                    func.lower(UseCase.solution).like(like),
+                    func.lower(UseCase.impact).like(like),
+                    func.lower(UseCase.tags).like(like),
+                )
             )
-        else:
-            print('Database already initialised.')
+        if industry:
+            query = query.filter(UseCase.industry == industry)
 
+        use_cases = query.order_by(UseCase.updated_at.desc()).all()
+        industries = [
+            value
+            for (value,) in db.session.query(UseCase.industry)
+            .filter(UseCase.industry.isnot(None))
+            .distinct()
+            .order_by(UseCase.industry)
+        ]
+        total_records = UseCase.query.count()
 
-def run_server() -> None:
-    """Run the Flask development server."""
-    app.run(debug=True)
+        return render_template(
+            "index.html",
+            use_cases=use_cases,
+            search=search,
+            industries=industries,
+            selected_industry=industry,
+            total_records=total_records,
+        )
 
+    @app.route("/login", methods=["GET", "POST"])
+    def login():
+        if current_user.is_authenticated:
+            return redirect(url_for("dashboard"))
+        form = LoginForm()
+        if form.validate_on_submit():
+            user = User.query.filter_by(username=form.username.data).first()
+            if user and user.check_password(form.password.data):
+                login_user(user)
+                return redirect(url_for("dashboard"))
+            flash("Invalid credentials", "danger")
+        return render_template("login.html", form=form)
 
-# ---------------------------------------------------------------------------
-# Views / Routes
-# ---------------------------------------------------------------------------
+    @app.route("/logout")
+    @login_required
+    def logout():
+        logout_user()
+        flash("Signed out successfully.", "info")
+        return redirect(url_for("login"))
 
-@app.route('/')
-@login_required
-def index():
-    """List records and provide navigation based on role."""
-    records = Record.query.all()
-    return render_template('index.html', records=records)
-
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    """Log in an existing user."""
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        user = User.query.filter_by(username=username).first()
-        if user and user.check_password(password):
-            login_user(user)
-            return redirect(url_for('index'))
-        flash('Invalid username or password')
-    return render_template('login.html')
-
-
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('login'))
-
-
-@app.route('/upload', methods=['GET', 'POST'])
-@login_required
-def upload():
-    """Allow admins to upload an Excel file and import its rows."""
-    # Enforce admin role
-    if not current_user.is_admin():
-        flash('You do not have permission to upload files.')
-        return redirect(url_for('index'))
-
-    if request.method == 'POST':
-        # Ensure a file was submitted
-        file = request.files.get('file')
-        if not file or file.filename == '':
-            flash('Please select a file to upload.')
-            return redirect(request.url)
-
-        try:
-            # Save file to a temporary location (optional) and parse
-            # using pandas.  The GeeksforGeeks example demonstrates
-            # reading Excel from request.files and converting to a
-            # DataFrame【954885212002298†L189-L225】.
-            df = pd.read_excel(file)
-        except Exception as exc:
-            flash(f'Error reading Excel file: {exc}')
-            return redirect(request.url)
-
-        # Convert rows into JSON records and insert into database
-        for _, row in df.iterrows():
-            record = Record(data=row.to_dict())
-            db.session.add(record)
-        db.session.commit()
-        flash(f'Successfully imported {len(df)} rows.')
-        return redirect(url_for('index'))
-
-    return render_template('upload.html')
-
-
-@app.route('/record/<int:record_id>/delete', methods=['POST'])
-@login_required
-def delete_record(record_id: int):
-    """Delete a record.  Only admins may perform this action."""
-    if not current_user.is_admin():
-        flash('You do not have permission to delete records.')
-        return redirect(url_for('index'))
-
-    record = Record.query.get_or_404(record_id)
-    db.session.delete(record)
-    db.session.commit()
-    flash('Record deleted.')
-    return redirect(url_for('index'))
-
-
-@app.route('/record/<int:record_id>/edit', methods=['GET', 'POST'])
-@login_required
-def edit_record(record_id: int):
-    """Edit a record's JSON data.  Only admins may edit."""
-    if not current_user.is_admin():
-        flash('You do not have permission to edit records.')
-        return redirect(url_for('index'))
-
-    record = Record.query.get_or_404(record_id)
-    if request.method == 'POST':
-        # We expect a JSON string in the form field named 'data'
-        # which should contain a valid Python dictionary literal.
-        try:
-            new_data = request.form['data']
-            # Evaluate user input carefully.  For a real app you
-            # should validate and parse JSON safely.  Here we use
-            # eval() for brevity — DO NOT use eval() in production.
-            record.data = eval(new_data)
+    @app.route("/use-cases/new", methods=["GET", "POST"])
+    @login_required
+    def create_use_case():
+        require_admin()
+        form = UseCaseForm()
+        form.submit.label.text = "Create use case"
+        if form.validate_on_submit():
+            use_case = UseCase(
+                title=form.title.data,
+                industry=form.industry.data or None,
+                summary=form.summary.data or None,
+                problem=form.problem.data or None,
+                solution=form.solution.data or None,
+                impact=form.impact.data or None,
+                data_source=form.data_source.data or None,
+                tags=form.tags.data or None,
+            )
+            db.session.add(use_case)
             db.session.commit()
-            flash('Record updated.')
-            return redirect(url_for('index'))
-        except Exception as exc:
-            flash(f'Invalid data: {exc}')
-            return redirect(request.url)
-    return render_template('edit_record.html', record=record)
+            flash("Use case created.", "success")
+            return redirect(url_for("dashboard"))
+        return render_template(
+            "use_case_form.html", form=form, heading="New use case"
+        )
+
+    @app.route("/use-cases/<int:use_case_id>/edit", methods=["GET", "POST"])
+    @login_required
+    def edit_use_case(use_case_id: int):
+        require_admin()
+        use_case = UseCase.query.get_or_404(use_case_id)
+        form = UseCaseForm(obj=use_case)
+        form.submit.label.text = "Save changes"
+        if form.validate_on_submit():
+            form.populate_obj(use_case)
+            db.session.commit()
+            flash("Use case updated.", "success")
+            return redirect(url_for("dashboard"))
+        return render_template(
+            "use_case_form.html",
+            form=form,
+            heading=f"Edit: {use_case.title}",
+            use_case=use_case,
+        )
+
+    @app.route("/use-cases/<int:use_case_id>")
+    @login_required
+    def use_case_detail(use_case_id: int):
+        use_case = UseCase.query.get_or_404(use_case_id)
+        return render_template("use_case_detail.html", use_case=use_case)
+
+    @app.route("/use-cases/<int:use_case_id>/delete", methods=["POST"])
+    @login_required
+    def delete_use_case(use_case_id: int):
+        require_admin()
+        use_case = UseCase.query.get_or_404(use_case_id)
+        db.session.delete(use_case)
+        db.session.commit()
+        flash("Use case deleted.", "info")
+        return redirect(url_for("dashboard"))
+
+    @app.route("/import", methods=["GET", "POST"])
+    @login_required
+    def import_excel():
+        require_admin()
+        form = UploadForm()
+        if form.validate_on_submit():
+            uploaded_file = form.file.data
+            filename = secure_filename(uploaded_file.filename)
+            saved_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            uploaded_file.save(saved_path)
+
+            try:
+                dataframe = pd.read_excel(saved_path)
+            except Exception as exc:  # pragma: no cover - user feedback only
+                flash(f"Could not read the spreadsheet: {exc}", "danger")
+                return redirect(request.url)
+
+            required_columns = {"Title", "Summary"}
+            missing_columns = required_columns - set(dataframe.columns)
+            if missing_columns:
+                flash(
+                    "Missing required columns: " + ", ".join(sorted(missing_columns)),
+                    "warning",
+                )
+                return redirect(request.url)
+
+            if form.import_mode.data == "replace":
+                UseCase.query.delete()
+
+            created = 0
+            for _, row in dataframe.iterrows():
+                use_case = UseCase(
+                    title=str(row.get("Title", "")).strip(),
+                    summary=_clean_cell(row.get("Summary")),
+                    industry=_clean_cell(row.get("Industry")),
+                    problem=_clean_cell(row.get("Problem")),
+                    solution=_clean_cell(row.get("Solution")),
+                    impact=_clean_cell(row.get("Impact")),
+                    data_source=_clean_cell(row.get("Data Source")),
+                    tags=_clean_cell(row.get("Tags")),
+                )
+                if use_case.title:
+                    db.session.add(use_case)
+                    created += 1
+            db.session.commit()
+
+            flash(f"Imported {created} records from {filename}.", "success")
+            return redirect(url_for("dashboard"))
+        return render_template("upload.html", form=form)
 
 
 # ---------------------------------------------------------------------------
-# Main entry point
+# Helpers
 # ---------------------------------------------------------------------------
 
-if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        cmd = sys.argv[1]
-        if cmd == 'initdb':
-            init_db()
-        elif cmd == 'run':
-            run_server()
-        else:
-            print('Unknown command.  Use "initdb" or "run".')
-    else:
-        # Default behaviour: run the development server
-        run_server()
+
+def _clean_cell(value) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+if __name__ == "__main__":
+    app.run(debug=True)

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="login-wrapper panel">
+    <h1>Welcome back</h1>
+    <p>Sign in to manage your catalogue of AI use cases.</p>
+    <form method="post">
+      {{ form.hidden_tag() }}
+      <div>
+        {{ form.username.label }}
+        {{ form.username(size=32, autofocus=true) }}
+      </div>
+      <div>
+        {{ form.password.label }}
+        {{ form.password(size=32) }}
+      </div>
+      {{ form.submit(class_="button") }}
+    </form>
+    <p class="muted">Ask your administrator for access credentials.</p>
+  </section>
+{% endblock %}
