@@ -93,6 +93,12 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), nullable=False, default="reader")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    owned_use_cases = db.relationship(
+        "UseCase",
+        secondary="use_case_owner",
+        back_populates="owners",
+        lazy="dynamic",
+    )
 
     def set_password(self, raw_password: str) -> None:
         self.password_hash = generate_password_hash(raw_password)
@@ -122,12 +128,35 @@ class UseCase(db.Model):
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
+    owners = db.relationship(
+        "User",
+        secondary="use_case_owner",
+        back_populates="owned_use_cases",
+        order_by="User.username",
+        lazy="selectin",
+    )
 
     def tag_list(self) -> list[str]:
         return [tag.strip() for tag in (self.tags or "").split(",") if tag.strip()]
 
+    def is_owned_by(self, user: User | None) -> bool:
+        if user is None or not getattr(user, "is_authenticated", False):
+            return False
+        return any(owner.id == user.id for owner in self.owners)
+
     def __repr__(self) -> str:  # pragma: no cover
         return f"<UseCase {self.title}>"
+
+
+class UseCaseOwner(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    use_case_id = db.Column(db.Integer, db.ForeignKey("use_case.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("use_case_id", "user_id", name="uq_use_case_owner"),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -175,6 +204,11 @@ class UploadForm(FlaskForm):
     submit = SubmitField("Upload")
 
 
+class UseCaseOwnerForm(FlaskForm):
+    user_id = SelectField("Add owner", coerce=int, validators=[DataRequired()])
+    submit = SubmitField("Add owner")
+
+
 # ---------------------------------------------------------------------------
 # Authentication utilities
 # ---------------------------------------------------------------------------
@@ -187,6 +221,15 @@ def load_user(user_id: str):
 
 def require_admin() -> None:
     if not current_user.is_authenticated or not current_user.is_admin:
+        abort(403)
+
+
+def can_manage_use_case(user: User, use_case: UseCase) -> bool:
+    return user.is_authenticated and (user.is_admin or use_case.is_owned_by(user))
+
+
+def require_use_case_manager(use_case: UseCase) -> None:
+    if not can_manage_use_case(current_user, use_case):
         abort(403)
 
 
@@ -346,8 +389,8 @@ def register_routes(app: Flask) -> None:
     @app.route("/use-cases/<int:use_case_id>/edit", methods=["GET", "POST"])
     @login_required
     def edit_use_case(use_case_id: int):
-        require_admin()
         use_case = UseCase.query.get_or_404(use_case_id)
+        require_use_case_manager(use_case)
         form = UseCaseForm(obj=use_case)
         form.submit.label.text = "Save changes"
         if form.validate_on_submit():
@@ -366,17 +409,53 @@ def register_routes(app: Flask) -> None:
     @login_required
     def use_case_detail(use_case_id: int):
         use_case = UseCase.query.get_or_404(use_case_id)
-        return render_template("use_case_detail.html", use_case=use_case)
+        owners = list(use_case.owners)
+        can_manage = can_manage_use_case(current_user, use_case)
+        owner_form = None
+        if can_manage:
+            owner_form = UseCaseOwnerForm()
+            owner_form.user_id.choices = _available_owner_choices(use_case)
+        return render_template(
+            "use_case_detail.html",
+            use_case=use_case,
+            owners=owners,
+            owner_form=owner_form,
+            can_manage_use_case=can_manage,
+        )
 
     @app.route("/use-cases/<int:use_case_id>/delete", methods=["POST"])
     @login_required
     def delete_use_case(use_case_id: int):
-        require_admin()
         use_case = UseCase.query.get_or_404(use_case_id)
+        require_use_case_manager(use_case)
         db.session.delete(use_case)
         db.session.commit()
         flash("Use case deleted.", "info")
         return redirect(url_for("dashboard"))
+
+    @app.route("/use-cases/<int:use_case_id>/owners", methods=["POST"])
+    @login_required
+    def add_use_case_owner(use_case_id: int):
+        use_case = UseCase.query.get_or_404(use_case_id)
+        require_use_case_manager(use_case)
+        form = UseCaseOwnerForm()
+        form.user_id.choices = _available_owner_choices(use_case)
+        if not form.user_id.choices:
+            flash("All users are already owners of this use case.", "info")
+            return redirect(url_for("use_case_detail", use_case_id=use_case_id))
+        if form.validate_on_submit():
+            new_owner = User.query.get(form.user_id.data)
+            if new_owner is None:
+                flash("Selected user could not be found.", "danger")
+            elif use_case.is_owned_by(new_owner):
+                flash(f"{new_owner.username} is already an owner.", "info")
+            else:
+                use_case.owners.append(new_owner)
+                db.session.commit()
+                flash(f"{new_owner.username} added as an owner.", "success")
+        else:
+            flash("Please choose a user to add as an owner.", "warning")
+        return redirect(url_for("use_case_detail", use_case_id=use_case_id))
 
     @app.route("/import", methods=["GET", "POST"])
     @login_required
@@ -439,6 +518,15 @@ def _clean_cell(value) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _available_owner_choices(use_case: UseCase) -> list[tuple[int, str]]:
+    owner_ids = {owner.id for owner in use_case.owners}
+    return [
+        (user.id, user.username)
+        for user in User.query.order_by(User.username).all()
+        if user.id not in owner_ids
+    ]
 
 
 def _upsert_user(*, username: str, password: str, role: str) -> None:
