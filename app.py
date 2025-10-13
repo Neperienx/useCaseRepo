@@ -38,7 +38,7 @@ from flask_login import (
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed, FileField, FileRequired
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, text
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 from wtforms import PasswordField, SelectField, StringField, SubmitField, TextAreaField
@@ -87,6 +87,7 @@ def create_app() -> Flask:
     # runtime ``OperationalError`` exceptions when accessing relationships.
     with app.app_context():
         db.create_all()
+        _ensure_database_schema()
 
     register_cli_commands(app)
     register_routes(app)
@@ -180,6 +181,26 @@ class UseCaseOwner(db.Model):
     __table_args__ = (
         db.UniqueConstraint("use_case_id", "user_id", name="uq_use_case_owner"),
     )
+
+
+# ---------------------------------------------------------------------------
+# Database maintenance helpers
+# ---------------------------------------------------------------------------
+
+
+def _ensure_database_schema() -> None:
+    """Make sure the live database includes columns added in newer releases."""
+
+    # ``db.create_all`` will happily create missing tables but it does not add
+    # new columns to an existing table, which is a common stumbling block when
+    # developing locally with SQLite.  We run a lightweight migration step to
+    # keep the ``use_case`` table in sync with the SQLAlchemy model definition.
+    inspector = db.session.execute(text("PRAGMA table_info(use_case)")).all()
+    existing_columns = {row[1] for row in inspector}
+
+    if "requestor" not in existing_columns:
+        db.session.execute(text("ALTER TABLE use_case ADD COLUMN requestor VARCHAR(200)"))
+        db.session.commit()
 
 
 # ---------------------------------------------------------------------------
