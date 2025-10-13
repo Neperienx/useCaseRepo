@@ -37,7 +37,7 @@
       </section>
     {% endif %}
 
-    {% if use_case.impact %}
+    {% if current_user.is_admin and use_case.impact %}
       <section>
         <h2>Impact</h2>
         <p>{{ use_case.impact }}</p>

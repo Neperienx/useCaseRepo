@@ -217,15 +217,33 @@ def register_cli_commands(app: Flask) -> None:
     def create_admin_command(username: str, password: str) -> None:
         """Create or update an administrator account."""
         with app.app_context():
-            user = User.query.filter_by(username=username).first()
-            if user is None:
-                user = User(username=username, role="admin")
-                db.session.add(user)
-            else:
-                user.role = "admin"
-            user.set_password(password)
-            db.session.commit()
+            _upsert_user(username=username, password=password, role="admin")
         click.echo(f"Admin user '{username}' is ready to log in.")
+
+    @app.cli.command("create-user")
+    @click.argument("username")
+    @click.option(
+        "--role",
+        type=click.Choice(["reader", "admin"], case_sensitive=False),
+        default="reader",
+        show_default=True,
+        help="Role to assign to the account.",
+    )
+    @click.option(
+        "--password",
+        prompt=True,
+        hide_input=True,
+        confirmation_prompt=True,
+        help="Password for the user account.",
+    )
+    def create_user_command(username: str, role: str, password: str) -> None:
+        """Create or update an account with the desired role."""
+        with app.app_context():
+            normalised_role = role.lower()
+            _upsert_user(username=username, password=password, role=normalised_role)
+        click.echo(
+            f"User '{username}' with role '{normalised_role}' is ready to log in."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -421,6 +439,23 @@ def _clean_cell(value) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _upsert_user(*, username: str, password: str, role: str) -> None:
+    """Create or update a user with the given credentials and role."""
+
+    role = role.lower()
+    if role not in {"admin", "reader"}:
+        raise ValueError("Role must be either 'admin' or 'reader'.")
+
+    user = User.query.filter_by(username=username).first()
+    if user is None:
+        user = User(username=username)
+        db.session.add(user)
+
+    user.role = role
+    user.set_password(password)
+    db.session.commit()
 
 
 app = create_app()
