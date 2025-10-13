@@ -64,11 +64,9 @@
         "visible_fields": [
           "title",
           "industry",
-          "requestor",
           "summary",
           "problem",
           "solution",
-          "impact",
           "data_source",
           "status_color"
         ]
