@@ -72,6 +72,13 @@ def create_app() -> Flask:
     db.init_app(app)
     login_manager.init_app(app)
 
+    # Ensure the database schema is present even if new tables were added
+    # after an existing database file had been created. ``create_all`` is
+    # idempotent and will only create the missing tables, which prevents
+    # runtime ``OperationalError`` exceptions when accessing relationships.
+    with app.app_context():
+        db.create_all()
+
     register_cli_commands(app)
     register_routes(app)
 
