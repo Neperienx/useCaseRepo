@@ -1,40 +1,54 @@
 {
   "import": {
-    "default_missing_value": "Undefined",
+    "default_missing_value": "Not specified",
     "fields": {
       "title": {
-        "column": "Title",
+        "column": "Use case name",
         "required": true,
-        "default": "Undefined"
+        "default": "Untitled use case"
       },
       "industry": {
-        "column": "Domain",
-        "default": "Undefined",
-        "label": "Domain"
+        "column": "Score Type",
+        "default": "Not scored",
+        "label": "Score type"
+      },
+      "requestor": {
+        "column": "Use Case Owner / Requestor (if Client)",
+        "default": "Not specified",
+        "label": "Use case owner / requestor"
       },
       "summary": {
-        "column": "Summary",
-        "default": "Undefined"
+        "column": "Description",
+        "default": "Not specified",
+        "label": "Description"
       },
       "problem": {
-        "column": "Problem",
-        "default": "Undefined"
+        "column": "Problem Statement",
+        "default": "Not specified",
+        "label": "Problem statement"
       },
       "solution": {
-        "column": "Solution",
-        "default": "Undefined"
+        "column": "Solution description",
+        "default": "Not specified",
+        "label": "Solution description"
       },
       "impact": {
-        "column": "Impact",
-        "default": "Undefined"
+        "column": "Estimated benefit (annualized, general)",
+        "default": "Not specified",
+        "label": "Estimated benefit"
       },
       "data_source": {
-        "column": "Data Source",
-        "default": "Undefined"
+        "column": "How was potential determined?",
+        "default": "Not specified",
+        "label": "Potential estimation approach"
+      },
+      "status_color": {
+        "column": "Status Color",
+        "default": "Not specified",
+        "label": "Status"
       },
       "tags": {
-        "column": "Tags",
-        "default": "Undefined"
+        "default": ""
       }
     }
   },
@@ -49,10 +63,13 @@
         "visible_fields": [
           "title",
           "industry",
+          "requestor",
           "summary",
           "problem",
           "solution",
-          "tags"
+          "impact",
+          "data_source",
+          "status_color"
         ]
       }
     },
@@ -64,9 +81,9 @@
   "visualizations": {
     "graphs": [
       {
-        "id": "use-cases-by-industry",
-        "title": "Use cases by industry",
-        "description": "Count of use cases per industry category.",
+        "id": "use-cases-by-score-type",
+        "title": "Use cases by score type",
+        "description": "Count of use cases per score type classification.",
         "type": "donut",
         "group_by": "industry",
         "metric": {
@@ -77,23 +94,46 @@
           "admin",
           "reader"
         ],
-        "missing_label": "Undefined"
+        "missing_label": "Not specified"
       },
       {
-        "id": "impact-by-industry",
-        "title": "Total impact by industry",
-        "description": "Aggregate impact values (sum) grouped by industry.",
+        "id": "use-cases-by-status",
+        "title": "Pipeline distribution by status",
+        "description": "How many initiatives sit in each status color.",
+        "type": "bar",
+        "group_by": "status_color",
+        "metric": {
+          "operation": "count",
+          "label": "Use case count"
+        },
+        "allowed_roles": [
+          "admin",
+          "reader"
+        ],
+        "missing_label": "Not specified",
+        "chart_options": {
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            }
+          }
+        }
+      },
+      {
+        "id": "benefit-by-score-type",
+        "title": "Estimated benefit by score type",
+        "description": "Sum of estimated annualised benefits, grouped by score type.",
         "type": "bar",
         "group_by": "industry",
         "metric": {
           "operation": "sum",
           "field": "impact",
-          "label": "Total impact"
+          "label": "Estimated benefit"
         },
         "allowed_roles": [
           "admin"
         ],
-        "missing_label": "Undefined",
+        "missing_label": "Not specified",
         "chart_options": {
           "scales": {
             "y": {

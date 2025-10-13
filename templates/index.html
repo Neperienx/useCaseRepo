@@ -31,15 +31,34 @@
       {% for item in use_cases %}
         <article class="card">
           <header>
+            <div class="card-meta">
+              {% if can_view_field(item, "status_color") and item.status_color %}
+                <span class="status-chip" style="--status-chip-color: {{ item.status_color }}">
+                  <span class="status-dot"></span>
+                  {{ item.status_color }}
+                </span>
+              {% endif %}
+              {% if can_view_field(item, "industry") and item.industry %}
+                <span class="tag">{{ item.industry }}</span>
+              {% endif %}
+            </div>
             {% if can_view_field(item, "title") %}
               <h3><a href="{{ url_for('use_case_detail', use_case_id=item.id) }}">{{ item.title }}</a></h3>
             {% else %}
               <h3><span class="muted">Restricted use case</span></h3>
             {% endif %}
-            {% if can_view_field(item, "industry") and item.industry %}<span class="tag">{{ item.industry }}</span>{% endif %}
+            {% if can_view_field(item, "requestor") and item.requestor %}
+              <p class="muted small"><strong>{{ field_labels.get('requestor', 'Requestor') }}:</strong> {{ item.requestor }}</p>
+            {% endif %}
           </header>
           {% if can_view_field(item, "summary") and item.summary %}
             <p>{{ item.summary|truncate(150) }}</p>
+          {% endif %}
+          {% if can_view_field(item, "impact") and item.impact %}
+            <p class="muted small"><strong>{{ field_labels.get('impact', 'Impact') }}:</strong> {{ item.impact }}</p>
+          {% endif %}
+          {% if can_view_field(item, "data_source") and item.data_source %}
+            <p class="muted small"><strong>{{ field_labels.get('data_source', 'Data source') }}:</strong> {{ item.data_source }}</p>
           {% endif %}
           {% if can_view_field(item, "tags") and item.tag_list() %}
             <div class="tag-list">

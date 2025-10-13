@@ -8,8 +8,19 @@
       {% else %}
         <h1>Restricted use case</h1>
       {% endif %}
-      {% if can_view_field(use_case, "industry") and use_case.industry %}
-        <span class="tag">{{ use_case.industry }}</span>
+      <div class="card-meta">
+        {% if can_view_field(use_case, "status_color") and use_case.status_color %}
+          <span class="status-chip" style="--status-chip-color: {{ use_case.status_color }}">
+            <span class="status-dot"></span>
+            {{ use_case.status_color }}
+          </span>
+        {% endif %}
+        {% if can_view_field(use_case, "industry") and use_case.industry %}
+          <span class="tag">{{ use_case.industry }}</span>
+        {% endif %}
+      </div>
+      {% if can_view_field(use_case, "requestor") and use_case.requestor %}
+        <p class="muted"><strong>{{ field_labels.get('requestor', 'Requestor') }}:</strong> {{ use_case.requestor }}</p>
       {% endif %}
       {% if can_view_field(use_case, "tags") and use_case.tag_list() %}
         <div class="tag-list">
@@ -22,35 +33,35 @@
 
     {% if can_view_field(use_case, "summary") and use_case.summary %}
       <section>
-        <h2>Summary</h2>
+        <h2>{{ field_labels.get('summary', 'Summary') }}</h2>
         <p>{{ use_case.summary }}</p>
       </section>
     {% endif %}
 
     {% if can_view_field(use_case, "problem") and use_case.problem %}
       <section>
-        <h2>Problem</h2>
+        <h2>{{ field_labels.get('problem', 'Problem') }}</h2>
         <p>{{ use_case.problem }}</p>
       </section>
     {% endif %}
 
     {% if can_view_field(use_case, "solution") and use_case.solution %}
       <section>
-        <h2>Solution</h2>
+        <h2>{{ field_labels.get('solution', 'Solution') }}</h2>
         <p>{{ use_case.solution }}</p>
       </section>
     {% endif %}
 
     {% if can_view_field(use_case, "impact") and use_case.impact %}
       <section>
-        <h2>Impact</h2>
+        <h2>{{ field_labels.get('impact', 'Impact') }}</h2>
         <p>{{ use_case.impact }}</p>
       </section>
     {% endif %}
 
     {% if can_view_field(use_case, "data_source") and use_case.data_source %}
       <section>
-        <h2>Data source</h2>
+        <h2>{{ field_labels.get('data_source', 'Data source') }}</h2>
         <p>{{ use_case.data_source }}</p>
       </section>
     {% endif %}

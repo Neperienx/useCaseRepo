@@ -145,6 +145,8 @@ class UseCase(db.Model):
     impact = db.Column(db.Text)
     data_source = db.Column(db.String(200))
     tags = db.Column(db.String(200))
+    requestor = db.Column(db.String(200))
+    status_color = db.Column(db.String(50))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
@@ -194,14 +196,20 @@ class LoginForm(FlaskForm):
 class UseCaseForm(FlaskForm):
     title = StringField("Title", validators=[DataRequired(), Length(max=200)])
     industry = StringField("Industry", validators=[Optional(), Length(max=120)])
+    requestor = StringField(
+        "Use case owner", validators=[Optional(), Length(max=200)]
+    )
     summary = TextAreaField("Summary", validators=[Optional()])
     problem = TextAreaField("Problem", validators=[Optional()])
     solution = TextAreaField("Solution", validators=[Optional()])
     impact = TextAreaField("Impact", validators=[Optional()])
-    data_source = StringField("Data source", validators=[Optional(), Length(max=200)])
+    data_source = TextAreaField("Data source", validators=[Optional()])
     tags = StringField(
         "Tags", validators=[Optional(), Length(max=200)],
         description="Comma-separated labels such as industries or technologies."
+    )
+    status_color = StringField(
+        "Status color", validators=[Optional(), Length(max=50)]
     )
     submit = SubmitField()
 
@@ -353,7 +361,10 @@ def register_routes(app: Flask) -> None:
                     func.lower(UseCase.problem).like(like),
                     func.lower(UseCase.solution).like(like),
                     func.lower(UseCase.impact).like(like),
+                    func.lower(UseCase.data_source).like(like),
                     func.lower(UseCase.tags).like(like),
+                    func.lower(UseCase.requestor).like(like),
+                    func.lower(UseCase.status_color).like(like),
                 )
             )
         if industry:
@@ -378,6 +389,7 @@ def register_routes(app: Flask) -> None:
             total_records=total_records,
             industry_label=industry_label,
             all_industry_label=all_industry_label,
+            field_labels=labels,
         )
 
     @app.route("/visualizations")
@@ -422,6 +434,8 @@ def register_routes(app: Flask) -> None:
                 impact=form.impact.data or None,
                 data_source=form.data_source.data or None,
                 tags=form.tags.data or None,
+                requestor=form.requestor.data or None,
+                status_color=form.status_color.data or None,
             )
             db.session.add(use_case)
             db.session.commit()
@@ -460,12 +474,15 @@ def register_routes(app: Flask) -> None:
         if can_manage:
             owner_form = UseCaseOwnerForm()
             owner_form.user_id.choices = _available_owner_choices(use_case)
+        config = current_app.config.get("USE_CASE_CONFIG", {})
+        field_labels = _field_labels_from_config(config)
         return render_template(
             "use_case_detail.html",
             use_case=use_case,
             owners=owners,
             owner_form=owner_form,
             can_manage_use_case=can_manage,
+            field_labels=field_labels,
         )
 
     @app.route("/use-cases/<int:use_case_id>/delete", methods=["POST"])
@@ -901,7 +918,7 @@ def _coerce_to_number(value) -> float:
     text = str(value).strip()
     if not text:
         return 0.0
-    normalised = text.replace(",", "")
+    normalised = re.sub(r"[^0-9.+-]", "", text.replace(",", ""))
     try:
         return float(normalised)
     except ValueError:

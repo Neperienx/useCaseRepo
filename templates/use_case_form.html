@@ -13,6 +13,14 @@
         {{ form.industry() }}
       </div>
       <div>
+        {{ form.requestor.label }}
+        {{ form.requestor() }}
+      </div>
+      <div>
+        {{ form.status_color.label }}
+        {{ form.status_color() }}
+      </div>
+      <div>
         {{ form.summary.label }}
         {{ form.summary(rows=4) }}
       </div>
@@ -30,7 +38,7 @@
       </div>
       <div>
         {{ form.data_source.label }}
-        {{ form.data_source() }}
+        {{ form.data_source(rows=3) }}
       </div>
       <div>
         {{ form.tags.label }}
