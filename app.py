@@ -199,7 +199,15 @@ def _ensure_database_schema() -> None:
     existing_columns = {row[1] for row in inspector}
 
     if "requestor" not in existing_columns:
-        db.session.execute(text("ALTER TABLE use_case ADD COLUMN requestor VARCHAR(200)"))
+        db.session.execute(
+            text("ALTER TABLE use_case ADD COLUMN requestor VARCHAR(200)")
+        )
+        db.session.commit()
+
+    if "status_color" not in existing_columns:
+        db.session.execute(
+            text("ALTER TABLE use_case ADD COLUMN status_color VARCHAR(50)")
+        )
         db.session.commit()
 
 
