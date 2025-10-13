@@ -6,9 +6,72 @@
       <p class="muted">Interactive charts summarising use case trends.</p>
     </header>
     {% if not graphs %}
-      <p class="muted">No visualisations are available for your role yet.</p>
+      {% if filters and active_filters %}
+        <p class="muted">No visualisations match the selected filters.</p>
+      {% else %}
+        <p class="muted">No visualisations are available for your role yet.</p>
+      {% endif %}
     {% endif %}
   </section>
+
+  {% if filters %}
+    <section class="panel">
+      <form method="get" class="filters-form" aria-label="Data filters">
+        <div class="filters-grid">
+          {% for filter in filters %}
+            <div class="filter-field">
+              {% if filter.type == 'select' %}
+                <label for="{{ filter.param }}">{{ filter.label }}</label>
+              {% else %}
+                <label>{{ filter.label }}</label>
+              {% endif %}
+              {% if filter.type == 'select' %}
+                <select id="{{ filter.param }}" name="{{ filter.param }}">
+                  <option value="">{{ filter.empty_label }}</option>
+                  {% for option in filter.options %}
+                    <option value="{{ option.value }}" {% if option.value == filter.value %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+              {% elif filter.type == 'range' %}
+                <div class="filter-range-inputs">
+                  <input
+                    type="number"
+                    id="{{ filter.min_param }}"
+                    name="{{ filter.min_param }}"
+                    value="{{ filter.current_min if filter.current_min is not none else '' }}"
+                    placeholder="{{ filter.placeholder_min }}"
+                    {% if filter.step %}step="{{ filter.step }}"{% endif %}
+                    {% if filter.dataset_min is not none %}min="{{ filter.dataset_min }}"{% endif %}
+                    aria-label="{{ filter.label }} minimum"
+                  >
+                  <span class="range-separator">to</span>
+                  <input
+                    type="number"
+                    id="{{ filter.max_param }}"
+                    name="{{ filter.max_param }}"
+                    value="{{ filter.current_max if filter.current_max is not none else '' }}"
+                    placeholder="{{ filter.placeholder_max }}"
+                    {% if filter.step %}step="{{ filter.step }}"{% endif %}
+                    {% if filter.dataset_max is not none %}max="{{ filter.dataset_max }}"{% endif %}
+                    aria-label="{{ filter.label }} maximum"
+                  >
+                  {% if filter.unit %}
+                    <small class="muted">{{ filter.unit }}</small>
+                  {% endif %}
+                </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+        <div class="filters-actions">
+          <button type="submit" class="button primary">Apply filters</button>
+          {% if active_filters %}
+            <a href="{{ url_for('visualizations') }}" class="button subtle">Clear filters ({{ active_filters }})</a>
+          {% endif %}
+        </div>
+      </form>
+    </section>
+  {% endif %}
 
   {% if graphs %}
     <section class="cards charts-grid">
