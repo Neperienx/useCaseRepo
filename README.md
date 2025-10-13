@@ -16,7 +16,7 @@ industries.
 - Modern Flask 3 application with SQLAlchemy 2 models
 - Local SQLite database stored in the `instance/` folder
 - Password-protected login using Flask-Login
-- Role-based permissions (`admin` vs `reader`)
+- Role-based permissions (`admin` vs `reader` with restricted Impact visibility)
 - Create, edit and delete AI use case entries from the web UI
 - Detail pages with structured sections (summary, problem, solution, impact)
 - Excel importer supporting append or replace modes
@@ -74,15 +74,30 @@ flask --app app init-db
 This creates `instance/use_cases.db`. The folder is generated automatically, so
 no manual directory setup is required.
 
-### 5. Create an administrator account
+### 5. Create user accounts
+
+Two roles are available:
+
+- **admin** users can create, edit, delete and import use cases.
+- **reader** users can browse every record but the *Impact* section remains
+  hidden from them on detail pages.
+
+Create an administrator account (or update an existing one) with:
 
 ```bash
-flask --app app create-admin your_username
+flask --app app create-admin your_admin_username
 # You will be prompted for a password twice
 ```
 
-Re-running the command with the same username updates its password and ensures
-the account keeps the `admin` role.
+Create a reader account with:
+
+```bash
+flask --app app create-user your_reader_username --role reader
+# You will be prompted for a password twice
+```
+
+You can rerun either command to reset the password or adjust the role assigned
+to a username (for example `flask --app app create-user analyst --role admin`).
 
 ### 6. Start the development server
 
