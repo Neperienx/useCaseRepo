@@ -15,6 +15,9 @@
       <nav>
         {% if current_user.is_authenticated %}
           <a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a>
+          {% if can_view_visualizations %}
+            <a class="nav-link" href="{{ url_for('visualizations') }}">Visualisations</a>
+          {% endif %}
           {% if current_user.is_admin %}
             <a class="nav-link" href="{{ url_for('create_use_case') }}">New use case</a>
             <a class="nav-link" href="{{ url_for('import_excel') }}">Import</a>
@@ -40,5 +43,6 @@
     <footer class="footer">
       <p>Built for Python 3.13.7 • {{ now.strftime('%Y') }}</p>
     </footer>
+    {% block scripts %}{% endblock %}
   </body>
 </html>
