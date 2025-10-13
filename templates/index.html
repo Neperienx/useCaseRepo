@@ -31,13 +31,17 @@
       {% for item in use_cases %}
         <article class="card">
           <header>
-            <h3><a href="{{ url_for('use_case_detail', use_case_id=item.id) }}">{{ item.title }}</a></h3>
-            {% if item.industry %}<span class="tag">{{ item.industry }}</span>{% endif %}
+            {% if can_view_field(item, "title") %}
+              <h3><a href="{{ url_for('use_case_detail', use_case_id=item.id) }}">{{ item.title }}</a></h3>
+            {% else %}
+              <h3><span class="muted">Restricted use case</span></h3>
+            {% endif %}
+            {% if can_view_field(item, "industry") and item.industry %}<span class="tag">{{ item.industry }}</span>{% endif %}
           </header>
-          {% if item.summary %}
+          {% if can_view_field(item, "summary") and item.summary %}
             <p>{{ item.summary|truncate(150) }}</p>
           {% endif %}
-          {% if item.tag_list() %}
+          {% if can_view_field(item, "tags") and item.tag_list() %}
             <div class="tag-list">
               {% for tag in item.tag_list() %}
                 <span class="tag">{{ tag }}</span>
