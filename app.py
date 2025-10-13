@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -95,6 +96,7 @@ def create_app() -> Flask:
             "app_title": "AI Use Case Library",
             "now": datetime.utcnow(),
             "can_view_field": _can_current_user_view_field,
+            "can_view_visualizations": _current_user_can_access_visualizations(),
         }
 
     return app
@@ -359,6 +361,12 @@ def register_routes(app: Flask) -> None:
             total_records=total_records,
         )
 
+    @app.route("/visualizations")
+    @login_required
+    def visualizations():
+        graphs = _visualization_payload_for_user(current_user)
+        return render_template("visualizations.html", graphs=graphs)
+
     @app.route("/login", methods=["GET", "POST"])
     def login():
         if current_user.is_authenticated:
@@ -619,6 +627,196 @@ def _clean_cell(value) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+CHART_COLOR_PALETTE = [
+    "#4F46E5",
+    "#F97316",
+    "#22D3EE",
+    "#10B981",
+    "#EC4899",
+    "#6366F1",
+    "#EAB308",
+    "#0EA5E9",
+    "#F43F5E",
+    "#14B8A6",
+]
+
+
+def _visualization_config() -> dict:
+    config = current_app.config.get("USE_CASE_CONFIG", {})
+    return config.get("visualizations", {})
+
+
+def _graphs_for_role(role: str | None) -> list[dict]:
+    role = (role or "reader").lower()
+    visuals = _visualization_config()
+    graphs = visuals.get("graphs", [])
+    accessible = []
+    for graph in graphs:
+        allowed_roles = graph.get("allowed_roles")
+        if allowed_roles:
+            if isinstance(allowed_roles, str):
+                allowed = {allowed_roles.lower()}
+            else:
+                allowed = {str(item).lower() for item in allowed_roles}
+            if role not in allowed:
+                continue
+        accessible.append(graph)
+    return accessible
+
+
+def _current_user_can_access_visualizations() -> bool:
+    return bool(_graphs_for_role(getattr(current_user, "role", None)))
+
+
+def _visualization_payload_for_user(user: User | None) -> list[dict]:
+    configs = _graphs_for_role(getattr(user, "role", None))
+    if not configs:
+        return []
+
+    use_cases = UseCase.query.all()
+    used_ids: set[str] = set()
+    prepared: list[dict] = []
+    for index, config in enumerate(configs, start=1):
+        payload = _build_visualization_graph(config, use_cases, used_ids, index)
+        if payload is not None:
+            prepared.append(payload)
+    return prepared
+
+
+def _build_visualization_graph(
+    config: dict, use_cases: list[UseCase], used_ids: set[str], index: int
+) -> dict | None:
+    aggregation = _aggregate_graph_values(config, use_cases)
+    if aggregation is None:
+        return None
+
+    labels = aggregation["labels"]
+    values = aggregation["values"]
+    chart_type = _normalise_chart_type(config.get("type"))
+    colors = _chart_colors(len(labels))
+    dataset = {
+        "label": aggregation["dataset_label"],
+        "data": values,
+        "backgroundColor": colors,
+    }
+
+    if chart_type == "bar":
+        dataset["borderRadius"] = 6
+        dataset["maxBarThickness"] = 48
+    else:
+        dataset["borderColor"] = "#ffffff"
+        dataset["borderWidth"] = 1
+        dataset["hoverOffset"] = 8
+
+    return {
+        "element_id": _unique_chart_element_id(config.get("id"), index, used_ids),
+        "title": config.get("title") or "Untitled graph",
+        "description": config.get("description"),
+        "chart_type": chart_type,
+        "labels": labels,
+        "dataset": dataset,
+        "options": config.get("chart_options") or {},
+    }
+
+
+def _aggregate_graph_values(
+    config: dict, use_cases: list[UseCase]
+) -> dict[str, list] | None:
+    group_by = config.get("group_by")
+    if not group_by:
+        return None
+
+    metric = config.get("metric") or {}
+    operation = (metric.get("operation") or "count").lower()
+    field = metric.get("field")
+    default_label = config.get("missing_label", "Undefined")
+
+    totals: dict[str, float] = {}
+    for use_case in use_cases:
+        raw_label = getattr(use_case, group_by, None)
+        if isinstance(raw_label, str):
+            raw_label = raw_label.strip()
+        label = str(raw_label) if raw_label else default_label
+
+        if operation == "sum":
+            if not field:
+                return None
+            value = _coerce_to_number(getattr(use_case, field, None))
+        else:
+            value = 1
+
+        totals[label] = totals.get(label, 0) + value
+
+    labels = list(totals.keys())
+    values = list(totals.values())
+    if operation != "sum":
+        values = [int(value) for value in values]
+
+    dataset_label = metric.get("label")
+    if not dataset_label:
+        dataset_label = (
+            "Use case count"
+            if operation == "count"
+            else f"Sum of {field or ''}".strip()
+        )
+
+    return {"labels": labels, "values": values, "dataset_label": dataset_label}
+
+
+def _chart_colors(count: int) -> list[str]:
+    if count <= 0:
+        return []
+    palette = []
+    for index in range(count):
+        palette.append(CHART_COLOR_PALETTE[index % len(CHART_COLOR_PALETTE)])
+    return palette
+
+
+def _normalise_chart_type(chart_type: str | None) -> str:
+    mapping = {
+        "donut": "doughnut",
+        "doughnut": "doughnut",
+        "pie": "pie",
+        "bar": "bar",
+    }
+    if not chart_type:
+        return "bar"
+    return mapping.get(chart_type.lower(), "bar")
+
+
+def _unique_chart_element_id(
+    raw_id: str | None, index: int, used_ids: set[str]
+) -> str:
+    base = _slugify_chart_id(str(raw_id) if raw_id else f"graph-{index}")
+    candidate = base
+    suffix = 1
+    while candidate in used_ids:
+        suffix += 1
+        candidate = f"{base}-{suffix}"
+    used_ids.add(candidate)
+    return f"chart-{candidate}"
+
+
+def _slugify_chart_id(value: str) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", value).strip("-").lower()
+    return slug or "graph"
+
+
+def _coerce_to_number(value) -> float:
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if not text:
+        return 0.0
+    normalised = text.replace(",", "")
+    try:
+        return float(normalised)
+    except ValueError:
+        return 0.0
 
 
 def _available_owner_choices(use_case: UseCase) -> list[tuple[int, str]]:

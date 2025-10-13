@@ -57,5 +57,43 @@
       "full_access": true,
       "additional_fields": []
     }
+  },
+  "visualizations": {
+    "graphs": [
+      {
+        "id": "use-cases-by-industry",
+        "title": "Use cases by industry",
+        "description": "Count of use cases per industry category.",
+        "type": "donut",
+        "group_by": "industry",
+        "metric": {
+          "operation": "count",
+          "label": "Use case count"
+        },
+        "allowed_roles": ["admin", "reader"],
+        "missing_label": "Undefined"
+      },
+      {
+        "id": "impact-by-industry",
+        "title": "Total impact by industry",
+        "description": "Aggregate impact values (sum) grouped by industry.",
+        "type": "bar",
+        "group_by": "industry",
+        "metric": {
+          "operation": "sum",
+          "field": "impact",
+          "label": "Total impact"
+        },
+        "allowed_roles": ["admin"],
+        "missing_label": "Undefined",
+        "chart_options": {
+          "scales": {
+            "y": {
+              "beginAtZero": true
+            }
+          }
+        }
+      }
+    ]
   }
 }

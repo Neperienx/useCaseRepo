@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="panel grid">
+    <header>
+      <h1>Data visualisations</h1>
+      <p class="muted">Interactive charts summarising use case trends.</p>
+    </header>
+    {% if not graphs %}
+      <p class="muted">No visualisations are available for your role yet.</p>
+    {% endif %}
+  </section>
+
+  {% if graphs %}
+    <section class="cards charts-grid">
+      {% for graph in graphs %}
+        <article class="card chart-card">
+          <header>
+            <h2>{{ graph.title }}</h2>
+          </header>
+          <div class="chart-wrapper">
+            <canvas id="{{ graph.element_id }}" aria-label="{{ graph.title }}" role="img"></canvas>
+          </div>
+          {% if graph.description %}
+            <p class="muted small">{{ graph.description }}</p>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </section>
+  {% endif %}
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const charts = {{ graphs | tojson }};
+    charts.forEach((config) => {
+      const canvas = document.getElementById(config.element_id);
+      if (!canvas) return;
+      const options = Object.assign({
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: config.chart_type === 'bar' ? 'top' : 'bottom' },
+          tooltip: { enabled: true }
+        }
+      }, config.options || {});
+      new Chart(canvas, {
+        type: config.chart_type,
+        data: {
+          labels: config.labels,
+          datasets: [config.dataset]
+        },
+        options
+      });
+    });
+  </script>
+{% endblock %}
