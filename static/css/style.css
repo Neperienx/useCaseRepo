@@ -138,6 +138,62 @@ nav {
   margin-top: 1.5rem;
 }
 
+.filters-form {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.filters-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.filter-field label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.filter-field select,
+.filter-field input[type="number"] {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font: inherit;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.filter-range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.range-separator {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.filters-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.button.subtle {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.button.subtle:hover {
+  color: var(--text);
+}
+
 .card {
   background: var(--panel);
   border-radius: 14px;

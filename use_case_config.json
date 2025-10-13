@@ -78,6 +78,36 @@
     }
   },
   "visualizations": {
+    "filters": [
+      {
+        "id": "business-sector",
+        "field": "industry",
+        "label": "Business sector",
+        "type": "select",
+        "allowed_roles": ["admin", "reader"],
+        "empty_label": "All sectors",
+        "missing_label": "Not specified"
+      },
+      {
+        "id": "benefit-type",
+        "field": "status_color",
+        "label": "Business benefit type",
+        "type": "select",
+        "allowed_roles": ["admin", "reader"],
+        "empty_label": "All benefit types",
+        "missing_label": "Not specified"
+      },
+      {
+        "id": "business-value",
+        "field": "impact",
+        "label": "Business value",
+        "type": "range",
+        "allowed_roles": ["admin"],
+        "placeholder_min": "Min value",
+        "placeholder_max": "Max value",
+        "unit": "Estimated value"
+      }
+    ],
     "graphs": [
       {
         "id": "use-cases-by-sector",

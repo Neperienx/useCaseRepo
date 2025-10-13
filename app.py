@@ -424,8 +424,17 @@ def register_routes(app: Flask) -> None:
     @app.route("/visualizations")
     @login_required
     def visualizations():
-        graphs = _visualization_payload_for_user(current_user)
-        return render_template("visualizations.html", graphs=graphs)
+        filters, filtered_use_cases = _prepare_visualization_filters(
+            current_user, request.args
+        )
+        graphs = _visualization_payload_for_user(current_user, filtered_use_cases)
+        active_filters = sum(1 for item in filters if item.get("is_active"))
+        return render_template(
+            "visualizations.html",
+            graphs=graphs,
+            filters=filters,
+            active_filters=active_filters,
+        )
 
     @app.route("/login", methods=["GET", "POST"])
     def login():
@@ -783,6 +792,11 @@ def _visualization_config() -> dict:
     return config.get("visualizations", {})
 
 
+def _visualization_filters_config() -> list[dict]:
+    visuals = _visualization_config()
+    return visuals.get("filters", [])
+
+
 def _graphs_for_role(role: str | None) -> list[dict]:
     role = (role or "reader").lower()
     visuals = _visualization_config()
@@ -805,12 +819,32 @@ def _current_user_can_access_visualizations() -> bool:
     return bool(_graphs_for_role(getattr(current_user, "role", None)))
 
 
-def _visualization_payload_for_user(user: User | None) -> list[dict]:
+def _filters_for_role(role: str | None) -> list[dict]:
+    role = (role or "reader").lower()
+    filters = _visualization_filters_config()
+    accessible = []
+    for filter_config in filters:
+        allowed_roles = filter_config.get("allowed_roles")
+        if allowed_roles:
+            if isinstance(allowed_roles, str):
+                allowed = {allowed_roles.lower()}
+            else:
+                allowed = {str(item).lower() for item in allowed_roles}
+            if role not in allowed:
+                continue
+        accessible.append(filter_config)
+    return accessible
+
+
+def _visualization_payload_for_user(
+    user: User | None, use_cases: list[UseCase] | None = None
+) -> list[dict]:
     configs = _graphs_for_role(getattr(user, "role", None))
     if not configs:
         return []
 
-    use_cases = UseCase.query.all()
+    if use_cases is None:
+        use_cases = UseCase.query.all()
     used_ids: set[str] = set()
     prepared: list[dict] = []
     for index, config in enumerate(configs, start=1):
@@ -818,6 +852,109 @@ def _visualization_payload_for_user(user: User | None) -> list[dict]:
         if payload is not None:
             prepared.append(payload)
     return prepared
+
+
+def _prepare_visualization_filters(
+    user: User | None, query_args
+) -> tuple[list[dict], list[UseCase]]:
+    accessible = _filters_for_role(getattr(user, "role", None))
+    if not accessible:
+        return [], UseCase.query.all()
+
+    all_use_cases = UseCase.query.all()
+    filtered_use_cases = list(all_use_cases)
+    prepared_filters: list[dict] = []
+
+    for config in accessible:
+        field = config.get("field")
+        if not field:
+            continue
+
+        filter_id = config.get("id") or field
+        slug = _slugify_chart_id(str(filter_id))
+        label = config.get("label") or field.replace("_", " ").title()
+        filter_type = (config.get("type") or "select").lower()
+
+        if filter_type == "select":
+            param_name = f"filter_{slug}"
+            selected_value = (query_args.get(param_name) or "").strip()
+            options = _build_select_filter_options(all_use_cases, field, config)
+            if selected_value:
+                filtered_use_cases = [
+                    use_case
+                    for use_case in filtered_use_cases
+                    if _filter_option_key(getattr(use_case, field, None))
+                    == selected_value
+                ]
+            prepared_filters.append(
+                {
+                    "id": slug,
+                    "label": label,
+                    "type": "select",
+                    "param": param_name,
+                    "value": selected_value,
+                    "options": options,
+                    "empty_label": config.get("empty_label") or "All",
+                    "is_active": bool(selected_value),
+                }
+            )
+        elif filter_type == "range":
+            param_min = f"filter_{slug}_min"
+            param_max = f"filter_{slug}_max"
+            current_min = _parse_filter_number(query_args.get(param_min))
+            current_max = _parse_filter_number(query_args.get(param_max))
+            numeric_values = [
+                value
+                for value in (
+                    _parse_filter_number(getattr(use_case, field, None))
+                    for use_case in all_use_cases
+                )
+                if value is not None
+            ]
+            dataset_min = min(numeric_values) if numeric_values else None
+            dataset_max = max(numeric_values) if numeric_values else None
+
+            if current_min is not None:
+                filtered_use_cases = [
+                    use_case
+                    for use_case in filtered_use_cases
+                    if (
+                        (value := _parse_filter_number(getattr(use_case, field, None)))
+                        is not None
+                        and value >= current_min
+                    )
+                ]
+            if current_max is not None:
+                filtered_use_cases = [
+                    use_case
+                    for use_case in filtered_use_cases
+                    if (
+                        (value := _parse_filter_number(getattr(use_case, field, None)))
+                        is not None
+                        and value <= current_max
+                    )
+                ]
+
+            prepared_filters.append(
+                {
+                    "id": slug,
+                    "label": label,
+                    "type": "range",
+                    "min_param": param_min,
+                    "max_param": param_max,
+                    "current_min": current_min,
+                    "current_max": current_max,
+                    "dataset_min": dataset_min,
+                    "dataset_max": dataset_max,
+                    "step": config.get("step"),
+                    "unit": config.get("unit"),
+                    "placeholder_min": config.get("placeholder_min") or "Min",
+                    "placeholder_max": config.get("placeholder_max") or "Max",
+                    "is_active": current_min is not None or current_max is not None,
+                }
+            )
+
+    return prepared_filters, filtered_use_cases
 
 
 def _build_visualization_graph(
@@ -854,6 +991,61 @@ def _build_visualization_graph(
         "dataset": dataset,
         "options": config.get("chart_options") or {},
     }
+
+
+def _build_select_filter_options(
+    use_cases: list[UseCase], field: str, config: dict
+) -> list[dict[str, str]]:
+    seen: dict[str, str] = {}
+    for use_case in use_cases:
+        raw_value = getattr(use_case, field, None)
+        key = _filter_option_key(raw_value)
+        label = _filter_option_label(raw_value, config)
+        if key not in seen:
+            seen[key] = label
+    options = [
+        {"value": value, "label": label}
+        for value, label in sorted(
+            seen.items(), key=lambda item: item[1].lower() if item[1] else ""
+        )
+    ]
+    return options
+
+
+def _filter_option_key(value) -> str:
+    if value is None:
+        return "__none__"
+    if isinstance(value, str):
+        text = value.strip()
+        return text if text else "__empty__"
+    return str(value)
+
+
+def _filter_option_label(value, config: dict) -> str:
+    missing_label = config.get("missing_label") or "Not specified"
+    if value is None:
+        return missing_label
+    if isinstance(value, str):
+        text = value.strip()
+        return text or missing_label
+    return str(value)
+
+
+def _parse_filter_number(value) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if not text:
+        return None
+    normalised = re.sub(r"[^0-9.+-]", "", text.replace(",", ""))
+    if not normalised:
+        return None
+    try:
+        return float(normalised)
+    except ValueError:
+        return None
 
 
 def _aggregate_graph_values(
