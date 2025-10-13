@@ -37,7 +37,7 @@
       </section>
     {% endif %}
 
-    {% if current_user.is_admin and use_case.impact %}
+    {% if can_manage_use_case and use_case.impact %}
       <section>
         <h2>Impact</h2>
         <p>{{ use_case.impact }}</p>
@@ -51,7 +51,35 @@
       </section>
     {% endif %}
 
-    {% if current_user.is_admin %}
+    <section>
+      <h2>Owners</h2>
+      {% if owners %}
+        <ul class="owner-list">
+          {% for owner in owners %}
+            <li>{{ owner.username }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">No owners have been assigned yet.</p>
+      {% endif %}
+
+      {% if can_manage_use_case %}
+        {% if owner_form and owner_form.user_id.choices %}
+          <form method="post" action="{{ url_for('add_use_case_owner', use_case_id=use_case.id) }}" class="owner-form">
+            {{ owner_form.hidden_tag() }}
+            <div class="form-row">
+              {{ owner_form.user_id.label }}
+              {{ owner_form.user_id() }}
+            </div>
+            {{ owner_form.submit(class_='button ghost') }}
+          </form>
+        {% elif owner_form %}
+          <p class="muted">Every user is already an owner of this use case.</p>
+        {% endif %}
+      {% endif %}
+    </section>
+
+    {% if can_manage_use_case %}
       <footer class="actions">
         <a class="button ghost" href="{{ url_for('edit_use_case', use_case_id=use_case.id) }}">Edit</a>
         <form action="{{ url_for('delete_use_case', use_case_id=use_case.id) }}" method="post">
