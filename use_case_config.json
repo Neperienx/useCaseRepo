@@ -1,0 +1,61 @@
+{
+  "import": {
+    "default_missing_value": "Undefined",
+    "fields": {
+      "title": {
+        "column": "Title",
+        "required": true,
+        "default": "Undefined"
+      },
+      "industry": {
+        "column": "Industry",
+        "default": "Undefined"
+      },
+      "summary": {
+        "column": "Summary",
+        "default": "Undefined"
+      },
+      "problem": {
+        "column": "Problem",
+        "default": "Undefined"
+      },
+      "solution": {
+        "column": "Solution",
+        "default": "Undefined"
+      },
+      "impact": {
+        "column": "Impact",
+        "default": "Undefined"
+      },
+      "data_source": {
+        "column": "Data Source",
+        "default": "Undefined"
+      },
+      "tags": {
+        "column": "Tags",
+        "default": "Undefined"
+      }
+    }
+  },
+  "access_control": {
+    "roles": {
+      "admin": {
+        "visible_fields": ["*"]
+      },
+      "reader": {
+        "visible_fields": [
+          "title",
+          "industry",
+          "summary",
+          "problem",
+          "solution",
+          "tags"
+        ]
+      }
+    },
+    "ownership": {
+      "full_access": true,
+      "additional_fields": []
+    }
+  }
+}

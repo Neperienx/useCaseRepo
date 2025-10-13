@@ -8,6 +8,7 @@ spreadsheets and browsing data with filters and full text search.
 """
 from __future__ import annotations
 
+import json
 import os
 from datetime import datetime
 from pathlib import Path
@@ -17,6 +18,7 @@ import pandas as pd
 from flask import (
     Flask,
     abort,
+    current_app,
     flash,
     redirect,
     render_template,
@@ -48,6 +50,8 @@ db = SQLAlchemy()
 login_manager = LoginManager()
 login_manager.login_view = "login"
 
+CONFIG_PATH = Path(__file__).with_name("use_case_config.json")
+
 
 def create_app() -> Flask:
     """Create and configure the Flask application instance."""
@@ -69,6 +73,9 @@ def create_app() -> Flask:
     os.makedirs(app.instance_path, exist_ok=True)
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
+    config_path = Path(os.getenv("USE_CASE_CONFIG_PATH", CONFIG_PATH))
+    app.config["USE_CASE_CONFIG"] = _load_use_case_config(config_path)
+
     db.init_app(app)
     login_manager.init_app(app)
 
@@ -84,7 +91,11 @@ def create_app() -> Flask:
 
     @app.context_processor
     def inject_globals():  # pragma: no cover - simple convenience
-        return {"app_title": "AI Use Case Library", "now": datetime.utcnow()}
+        return {
+            "app_title": "AI Use Case Library",
+            "now": datetime.utcnow(),
+            "can_view_field": _can_current_user_view_field,
+        }
 
     return app
 
@@ -481,33 +492,67 @@ def register_routes(app: Flask) -> None:
                 flash(f"Could not read the spreadsheet: {exc}", "danger")
                 return redirect(request.url)
 
-            required_columns = {"Title", "Summary"}
-            missing_columns = required_columns - set(dataframe.columns)
-            if missing_columns:
-                flash(
-                    "Missing required columns: " + ", ".join(sorted(missing_columns)),
-                    "warning",
-                )
+            config = current_app.config.get("USE_CASE_CONFIG", {})
+            import_config = config.get("import", {})
+            field_mappings = import_config.get("fields", {})
+            default_missing_value = import_config.get(
+                "default_missing_value", "Undefined"
+            )
+
+            if not field_mappings:
+                flash("No import field mappings are configured.", "danger")
                 return redirect(request.url)
+
+            configured_columns = {
+                details.get("column")
+                for details in field_mappings.values()
+                if details.get("column")
+            }
+            present_columns = set(dataframe.columns)
+            missing_columns = sorted(configured_columns - present_columns)
+            if missing_columns:
+                placeholder = default_missing_value if default_missing_value is not None else ""
+                flash(
+                    "Missing columns were set to"
+                    f" '{placeholder or 'blank'}': "
+                    + ", ".join(missing_columns),
+                    "info",
+                )
 
             if form.import_mode.data == "replace":
                 UseCase.query.delete()
 
+            column_absent = {
+                field: details.get("column") not in dataframe.columns
+                if details.get("column")
+                else True
+                for field, details in field_mappings.items()
+            }
+
             created = 0
             for _, row in dataframe.iterrows():
-                use_case = UseCase(
-                    title=str(row.get("Title", "")).strip(),
-                    summary=_clean_cell(row.get("Summary")),
-                    industry=_clean_cell(row.get("Industry")),
-                    problem=_clean_cell(row.get("Problem")),
-                    solution=_clean_cell(row.get("Solution")),
-                    impact=_clean_cell(row.get("Impact")),
-                    data_source=_clean_cell(row.get("Data Source")),
-                    tags=_clean_cell(row.get("Tags")),
-                )
-                if use_case.title:
-                    db.session.add(use_case)
-                    created += 1
+                use_case_data = {}
+                for field, details in field_mappings.items():
+                    column_name = details.get("column")
+                    default_value = details.get("default", default_missing_value)
+                    value = None
+                    if column_name and not column_absent.get(field, True):
+                        value = _clean_cell(row.get(column_name))
+                    if value is None and column_absent.get(field, True):
+                        value = default_value
+
+                    if field == "title" and not value:
+                        value = default_value or default_missing_value or "Untitled use case"
+
+                    use_case_data[field] = value
+
+                if not use_case_data.get("title"):
+                    continue
+
+                use_case = UseCase(**use_case_data)
+                db.session.add(use_case)
+                created += 1
+
             db.session.commit()
 
             flash(f"Imported {created} records from {filename}.", "success")
@@ -518,6 +563,55 @@ def register_routes(app: Flask) -> None:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _load_use_case_config(path: Path) -> dict:
+    try:
+        with path.open("r", encoding="utf-8") as config_file:
+            return json.load(config_file)
+    except FileNotFoundError:  # pragma: no cover - configuration safeguard
+        return {
+            "import": {"default_missing_value": "Undefined", "fields": {}},
+            "access_control": {},
+        }
+
+
+def _configured_use_case_fields() -> set[str]:
+    config = current_app.config.get("USE_CASE_CONFIG", {})
+    return set(config.get("import", {}).get("fields", {}).keys())
+
+
+def _visible_fields_for_user(user: User | None, use_case: UseCase | None = None) -> set[str]:
+    config = current_app.config.get("USE_CASE_CONFIG", {})
+    all_fields = _configured_use_case_fields()
+    access_control = config.get("access_control", {})
+    roles = access_control.get("roles", {})
+    role_name = getattr(user, "role", None) or "reader"
+    role_fields = set(roles.get(role_name, {}).get("visible_fields", []))
+
+    if "*" in role_fields:
+        visible = set(all_fields)
+    else:
+        visible = role_fields & all_fields
+
+    ownership_cfg = access_control.get("ownership", {})
+    if use_case is not None and user is not None and use_case.is_owned_by(user):
+        if ownership_cfg.get("full_access"):
+            visible = set(all_fields)
+        else:
+            visible |= set(ownership_cfg.get("additional_fields", [])) & all_fields
+
+    return visible
+
+
+def user_can_view_field(user: User | None, use_case: UseCase | None, field: str) -> bool:
+    if field not in _configured_use_case_fields():
+        return False
+    return field in _visible_fields_for_user(user, use_case)
+
+
+def _can_current_user_view_field(use_case: UseCase | None, field: str) -> bool:
+    return user_can_view_field(current_user, use_case, field)
 
 
 def _clean_cell(value) -> str | None:
