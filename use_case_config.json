@@ -8,8 +8,9 @@
         "default": "Undefined"
       },
       "industry": {
-        "column": "Industry",
-        "default": "Undefined"
+        "column": "Domain",
+        "default": "Undefined",
+        "label": "Domain"
       },
       "summary": {
         "column": "Summary",
@@ -40,7 +41,9 @@
   "access_control": {
     "roles": {
       "admin": {
-        "visible_fields": ["*"]
+        "visible_fields": [
+          "*"
+        ]
       },
       "reader": {
         "visible_fields": [
@@ -70,7 +73,10 @@
           "operation": "count",
           "label": "Use case count"
         },
-        "allowed_roles": ["admin", "reader"],
+        "allowed_roles": [
+          "admin",
+          "reader"
+        ],
         "missing_label": "Undefined"
       },
       {
@@ -84,7 +90,9 @@
           "field": "impact",
           "label": "Total impact"
         },
-        "allowed_roles": ["admin"],
+        "allowed_roles": [
+          "admin"
+        ],
         "missing_label": "Undefined",
         "chart_options": {
           "scales": {

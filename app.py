@@ -25,6 +25,7 @@ from flask import (
     render_template,
     request,
     url_for,
+    has_app_context,
 )
 from flask_login import (
     LoginManager,
@@ -204,6 +205,17 @@ class UseCaseForm(FlaskForm):
     )
     submit = SubmitField()
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not has_app_context():
+            return
+        config = current_app.config.get("USE_CASE_CONFIG", {})
+        labels = _field_labels_from_config(config)
+        for field_name, label in labels.items():
+            field = getattr(self, field_name, None)
+            if field is not None:
+                field.label.text = label
+
 
 class UploadForm(FlaskForm):
     file = FileField(
@@ -326,6 +338,11 @@ def register_routes(app: Flask) -> None:
         search = request.args.get("q", "").strip()
         industry = request.args.get("industry", "").strip()
 
+        config = current_app.config.get("USE_CASE_CONFIG", {})
+        labels = _field_labels_from_config(config)
+        industry_label = labels.get("industry", _humanize_field_name("industry"))
+        all_industry_label = _all_option_label(industry_label)
+
         query = UseCase.query
         if search:
             like = f"%{search.lower()}%"
@@ -359,6 +376,8 @@ def register_routes(app: Flask) -> None:
             industries=industries,
             selected_industry=industry,
             total_records=total_records,
+            industry_label=industry_label,
+            all_industry_label=all_industry_label,
         )
 
     @app.route("/visualizations")
@@ -487,7 +506,12 @@ def register_routes(app: Flask) -> None:
     @login_required
     def import_excel():
         require_admin()
+        config = current_app.config.get("USE_CASE_CONFIG", {})
+        import_config = config.get("import", {})
+        field_mappings = _field_mappings_from_config(config)
         form = UploadForm()
+        upload_columns = list(_field_columns_from_config(config).values())
+        upload_columns_text = _format_columns_list(upload_columns)
         if form.validate_on_submit():
             uploaded_file = form.file.data
             filename = secure_filename(uploaded_file.filename)
@@ -500,9 +524,6 @@ def register_routes(app: Flask) -> None:
                 flash(f"Could not read the spreadsheet: {exc}", "danger")
                 return redirect(request.url)
 
-            config = current_app.config.get("USE_CASE_CONFIG", {})
-            import_config = config.get("import", {})
-            field_mappings = import_config.get("fields", {})
             default_missing_value = import_config.get(
                 "default_missing_value", "Undefined"
             )
@@ -565,7 +586,12 @@ def register_routes(app: Flask) -> None:
 
             flash(f"Imported {created} records from {filename}.", "success")
             return redirect(url_for("dashboard"))
-        return render_template("upload.html", form=form)
+        return render_template(
+            "upload.html",
+            form=form,
+            upload_columns=upload_columns,
+            upload_columns_text=upload_columns_text,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -587,6 +613,69 @@ def _load_use_case_config(path: Path) -> dict:
 def _configured_use_case_fields() -> set[str]:
     config = current_app.config.get("USE_CASE_CONFIG", {})
     return set(config.get("import", {}).get("fields", {}).keys())
+
+
+def _field_mappings_from_config(config: dict) -> dict[str, dict]:
+    fields = config.get("import", {}).get("fields", {})
+    return fields if isinstance(fields, dict) else {}
+
+
+def _field_columns_from_config(config: dict) -> dict[str, str]:
+    mappings = {}
+    for field, details in _field_mappings_from_config(config).items():
+        if isinstance(details, dict):
+            column = details.get("column")
+            if column:
+                mappings[field] = column
+    return mappings
+
+
+def _format_columns_list(columns: list[str]) -> str:
+    cleaned = [column for column in columns if column]
+    if not cleaned:
+        return ""
+    if len(cleaned) == 1:
+        return cleaned[0]
+    if len(cleaned) == 2:
+        return " and ".join(cleaned)
+    return ", ".join(cleaned[:-1]) + f" and {cleaned[-1]}"
+
+
+def _field_labels_from_config(config: dict) -> dict[str, str]:
+    labels: dict[str, str] = {}
+    for field, details in _field_mappings_from_config(config).items():
+        if not isinstance(details, dict):
+            continue
+        label = details.get("label") or details.get("column")
+        if not label:
+            label = _humanize_field_name(field)
+        labels[field] = label
+    return labels
+
+
+def _humanize_field_name(name: str) -> str:
+    if not name:
+        return ""
+    parts = [part for part in name.replace("-", "_").split("_") if part]
+    return " ".join(part.capitalize() for part in parts) if parts else name
+
+
+def _all_option_label(label: str) -> str:
+    if not label:
+        return "All"
+    return f"All {_pluralize_label(label)}"
+
+
+def _pluralize_label(label: str) -> str:
+    word = label.strip()
+    if not word:
+        return ""
+    lower = word.lower()
+    if lower.endswith("y") and len(lower) > 1 and lower[-2] not in "aeiou":
+        return lower[:-1] + "ies"
+    if lower.endswith("s"):
+        return lower
+    return lower + "s"
 
 
 def _visible_fields_for_user(user: User | None, use_case: UseCase | None = None) -> set[str]:

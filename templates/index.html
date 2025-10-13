@@ -11,9 +11,9 @@
         <input type="text" id="search" name="q" value="{{ search }}" placeholder="Find by title, tags or description">
       </div>
       <div>
-        <label for="industry">Industry</label>
+        <label for="industry">{{ industry_label }}</label>
         <select id="industry" name="industry">
-          <option value="">All industries</option>
+          <option value="">{{ all_industry_label }}</option>
           {% for option in industries %}
             <option value="{{ option }}" {% if option == selected_industry %}selected{% endif %}>{{ option }}</option>
           {% endfor %}

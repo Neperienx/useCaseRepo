@@ -2,7 +2,13 @@
 {% block content %}
   <section class="panel">
     <h1>Import from Excel</h1>
-    <p class="muted">Upload a spreadsheet with columns such as Title, Summary, Industry, Problem, Solution, Impact, Tags and Data Source.</p>
+    <p class="muted">
+      {% if upload_columns_text %}
+        Upload a spreadsheet with columns such as {{ upload_columns_text }}.
+      {% else %}
+        Upload a spreadsheet that matches your configured fields.
+      {% endif %}
+    </p>
     <form method="post" enctype="multipart/form-data">
       {{ form.hidden_tag() }}
       <div>

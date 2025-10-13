@@ -131,7 +131,7 @@ When importing from Excel the following columns are recognised:
 | ----------- | ------- |
 | `Title` | Required. Becomes the record title. |
 | `Summary` | Short description shown in the dashboard cards. |
-| `Industry` | Optional label rendered as a pill. |
+| `Domain` | Optional label rendered as a pill. |
 | `Problem`, `Solution`, `Impact` | Rendered on the detail page. |
 | `Tags` | Comma separated list of tags for quick filtering. |
 | `Data Source` | Track where the information came from. |
@@ -146,18 +146,18 @@ The spreadsheet importer is configuration-driven. All column mappings live in
 `"import"` key. Each entry maps a model field (for example `industry`) to the
 expected spreadsheet column header via a `"column"` value and optionally
 declares a fallback `"default"` when the column is missing.【F:use_case_config.json†L1-L34】
+You can also supply a user-facing `"label"` that the UI will reuse for
+form inputs and filters.
 
 #### Changing a column header (e.g. `Industry` → `Domain`)
 
 1. Update the spreadsheet header from **Industry** to **Domain**.
 2. Edit the `industry` mapping in `use_case_config.json` so the `"column"`
-   attribute reads `"Domain"` instead of `"Industry"`.
-3. (Optional) Rename any user-facing labels in the UI to keep them consistent:
-   - Form field label in `app.py` (`UseCaseForm.industry`).【F:app.py†L188-L200】
-   - Dashboard filter label in `templates/index.html`.
-   - Helper text on the upload page in `templates/upload.html`.
+   attribute reads `"Domain"`. Set the optional `"label"` to control how the
+   field is named across the UI.
 
-The database column remains `industry`, so no schema changes are required.
+The database column remains `industry`, so no schema changes are required and no
+template or form tweaks are necessary.
 
 #### Adding a new column (e.g. `Type of benefits`)
 
