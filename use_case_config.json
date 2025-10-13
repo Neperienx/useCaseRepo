@@ -3,17 +3,16 @@
     "default_missing_value": "Not specified",
     "fields": {
       "title": {
-        "column": "Use case name",
+        "column": "Use Case Name",
         "required": true,
         "default": "Untitled use case"
       },
       "industry": {
-        "column": "Score Type",
-        "default": "Not scored",
-        "label": "Score type"
+        "column": "Business Sector",
+        "default": "Not specified",
+        "label": "Business sector"
       },
       "requestor": {
-        "column": "Use Case Owner / Requestor (if Client)",
         "default": "Not specified",
         "label": "Use case owner / requestor"
       },
@@ -23,32 +22,34 @@
         "label": "Description"
       },
       "problem": {
-        "column": "Problem Statement",
+        "column": "ProblemStatement",
         "default": "Not specified",
         "label": "Problem statement"
       },
       "solution": {
-        "column": "Solution description",
+        "column": "SolutionDescription",
         "default": "Not specified",
         "label": "Solution description"
       },
       "impact": {
-        "column": "Estimated benefit (annualized, general)",
-        "default": "Not specified",
-        "label": "Estimated benefit"
+        "column": "Business Value Estimate (Numerical)",
+        "default": "0",
+        "label": "Business value estimate"
       },
       "data_source": {
-        "column": "How was potential determined?",
+        "column": "Source Stage",
         "default": "Not specified",
-        "label": "Potential estimation approach"
+        "label": "Source stage"
       },
       "status_color": {
-        "column": "Status Color",
+        "column": "New Type of Business Benefit",
         "default": "Not specified",
-        "label": "Status"
+        "label": "Business benefit type"
       },
       "tags": {
-        "default": ""
+        "column": "New Domain Mapping for G Level",
+        "default": "",
+        "label": "Domain mapping"
       }
     }
   },
@@ -81,9 +82,9 @@
   "visualizations": {
     "graphs": [
       {
-        "id": "use-cases-by-score-type",
-        "title": "Use cases by score type",
-        "description": "Count of use cases per score type classification.",
+        "id": "use-cases-by-sector",
+        "title": "Use cases by business sector",
+        "description": "Count of use cases per business sector.",
         "type": "donut",
         "group_by": "industry",
         "metric": {
@@ -97,9 +98,9 @@
         "missing_label": "Not specified"
       },
       {
-        "id": "use-cases-by-status",
-        "title": "Pipeline distribution by status",
-        "description": "How many initiatives sit in each status color.",
+        "id": "use-cases-by-benefit-type",
+        "title": "Use cases by business benefit type",
+        "description": "How many initiatives sit in each business benefit classification.",
         "type": "bar",
         "group_by": "status_color",
         "metric": {
@@ -120,15 +121,15 @@
         }
       },
       {
-        "id": "benefit-by-score-type",
-        "title": "Estimated benefit by score type",
-        "description": "Sum of estimated annualised benefits, grouped by score type.",
+        "id": "benefit-by-sector",
+        "title": "Business value by sector",
+        "description": "Sum of estimated business value, grouped by business sector.",
         "type": "bar",
         "group_by": "industry",
         "metric": {
           "operation": "sum",
           "field": "impact",
-          "label": "Estimated benefit"
+          "label": "Business value"
         },
         "allowed_roles": [
           "admin"
