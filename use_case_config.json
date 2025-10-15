@@ -78,6 +78,18 @@
     }
   },
   "visualizations": {
+    "color_palette": [
+      "#a09f97",
+      "#b5b4a9",
+      "#8a8a84",
+      "#c4cac5",
+      "#074c3c",
+      "#536a69",
+      "#031e2d",
+      "#0a5c8e",
+      "#73325d",
+      "#39122b"
+    ],
     "filters": [
       {
         "id": "business-sector",

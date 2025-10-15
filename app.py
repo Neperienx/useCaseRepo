@@ -773,18 +773,33 @@ def _clean_cell(value) -> str | None:
     return text or None
 
 
-CHART_COLOR_PALETTE = [
-    "#4F46E5",
-    "#F97316",
-    "#22D3EE",
-    "#10B981",
-    "#EC4899",
-    "#6366F1",
-    "#EAB308",
-    "#0EA5E9",
-    "#F43F5E",
-    "#14B8A6",
+DEFAULT_CHART_COLOR_PALETTE = [
+    "#a09f97",
+    "#b5b4a9",
+    "#8a8a84",
+    "#c4cac5",
+    "#074c3c",
+    "#536a69",
+    "#031e2d",
+    "#0a5c8e",
+    "#73325d",
+    "#39122b",
 ]
+
+
+def _chart_color_palette() -> list[str]:
+    palette = _visualization_config().get("color_palette")
+    if isinstance(palette, list):
+        cleaned = []
+        for color in palette:
+            if color is None:
+                continue
+            text = str(color).strip()
+            if text:
+                cleaned.append(text)
+        if cleaned:
+            return cleaned
+    return DEFAULT_CHART_COLOR_PALETTE
 
 
 def _visualization_config() -> dict:
@@ -1095,9 +1110,10 @@ def _aggregate_graph_values(
 def _chart_colors(count: int) -> list[str]:
     if count <= 0:
         return []
+    palette_config = _chart_color_palette()
     palette = []
     for index in range(count):
-        palette.append(CHART_COLOR_PALETTE[index % len(CHART_COLOR_PALETTE)])
+        palette.append(palette_config[index % len(palette_config)])
     return palette
 
 
