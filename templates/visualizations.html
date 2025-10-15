@@ -30,11 +30,11 @@
                   id="{{ filter.param }}"
                   name="{{ filter.param }}"
                   multiple
-                  size="{{ filter.size }}"
+                  class="filter-multiselect"
                   aria-describedby="{{ filter.param }}-help"
                 >
                   {% for option in filter.options %}
-                    <option value="{{ option.value }}" {% if option.value in filter.values %}selected{% endif %}>{{ option.label }}</option>
+                    <option value="{{ option.value }}" {% if option.value in filter['values'] %}selected{% endif %}>{{ option.label }}</option>
                   {% endfor %}
                 </select>
                 <small id="{{ filter.param }}-help" class="muted">{{ filter.help_text }}</small>
