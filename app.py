@@ -890,14 +890,16 @@ def _prepare_visualization_filters(
 
         if filter_type == "select":
             param_name = f"filter_{slug}"
-            selected_value = (query_args.get(param_name) or "").strip()
+            raw_values = query_args.getlist(param_name)
+            selected_values = [value for value in raw_values if value != ""]
             options = _build_select_filter_options(all_use_cases, field, config)
-            if selected_value:
+            if selected_values:
                 filtered_use_cases = [
                     use_case
                     for use_case in filtered_use_cases
-                    if _filter_option_key(getattr(use_case, field, None))
-                    == selected_value
+                    if _value_matches_select_filter(
+                        getattr(use_case, field, None), selected_values, config
+                    )
                 ]
             prepared_filters.append(
                 {
@@ -905,10 +907,14 @@ def _prepare_visualization_filters(
                     "label": label,
                     "type": "select",
                     "param": param_name,
-                    "value": selected_value,
+                    "values": selected_values,
                     "options": options,
                     "empty_label": config.get("empty_label") or "All",
-                    "is_active": bool(selected_value),
+                    "is_active": bool(selected_values),
+                    "size": config.get("size")
+                    or max(3, min(len(options), 8)),
+                    "help_text": config.get("help_text")
+                    or "Leave unselected to include all values.",
                 }
             )
         elif filter_type == "range":
@@ -1012,10 +1018,11 @@ def _build_select_filter_options(
     seen: dict[str, str] = {}
     for use_case in use_cases:
         raw_value = getattr(use_case, field, None)
-        key = _filter_option_key(raw_value)
-        label = _filter_option_label(raw_value, config)
-        if key not in seen:
-            seen[key] = label
+        for value in _split_filter_values(raw_value, config):
+            key = _filter_option_key(value)
+            label = _filter_option_label(value, config)
+            if key not in seen:
+                seen[key] = label
     options = [
         {"value": value, "label": label}
         for value, label in sorted(
@@ -1042,6 +1049,26 @@ def _filter_option_label(value, config: dict) -> str:
         text = value.strip()
         return text or missing_label
     return str(value)
+
+
+def _split_filter_values(value, config: dict) -> list:
+    separator = config.get("value_separator")
+    if separator and isinstance(value, str):
+        parts = [part.strip() for part in value.split(separator)]
+        parts = [part for part in parts if part]
+        if parts:
+            return parts
+        return [""]
+    return [value]
+
+
+def _value_matches_select_filter(value, selected: list[str], config: dict) -> bool:
+    if not selected:
+        return True
+    return any(
+        _filter_option_key(candidate) in selected
+        for candidate in _split_filter_values(value, config)
+    )
 
 
 def _parse_filter_number(value) -> float | None:

@@ -26,12 +26,18 @@
                 <label>{{ filter.label }}</label>
               {% endif %}
               {% if filter.type == 'select' %}
-                <select id="{{ filter.param }}" name="{{ filter.param }}">
-                  <option value="">{{ filter.empty_label }}</option>
+                <select
+                  id="{{ filter.param }}"
+                  name="{{ filter.param }}"
+                  multiple
+                  size="{{ filter.size }}"
+                  aria-describedby="{{ filter.param }}-help"
+                >
                   {% for option in filter.options %}
-                    <option value="{{ option.value }}" {% if option.value == filter.value %}selected{% endif %}>{{ option.label }}</option>
+                    <option value="{{ option.value }}" {% if option.value in filter.values %}selected{% endif %}>{{ option.label }}</option>
                   {% endfor %}
                 </select>
+                <small id="{{ filter.param }}-help" class="muted">{{ filter.help_text }}</small>
               {% elif filter.type == 'range' %}
                 <div class="filter-range-inputs">
                   <input
