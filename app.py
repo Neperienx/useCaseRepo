@@ -53,6 +53,7 @@ login_manager = LoginManager()
 login_manager.login_view = "login"
 
 CONFIG_PATH = Path(__file__).with_name("use_case_config.json")
+COLOR_OVERRIDE_PATH = Path(__file__).with_name("visualization_color_overrides.json")
 
 
 def create_app() -> Flask:
@@ -800,6 +801,40 @@ def _chart_color_palette() -> list[str]:
     return DEFAULT_CHART_COLOR_PALETTE
 
 
+def _load_visualization_color_overrides() -> dict[str, str]:
+    path = COLOR_OVERRIDE_PATH
+    if has_app_context():
+        override_path = current_app.config.get(
+            "VISUALIZATION_COLOR_OVERRIDE_PATH", path
+        )
+        path = Path(override_path)
+        if not path.is_absolute():
+            path = Path(current_app.root_path) / path
+
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+
+    if not isinstance(data, dict):
+        return {}
+
+    overrides: dict[str, str] = {}
+    for key, value in data.items():
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            overrides[str(key)] = text
+
+    return overrides
+
+
 def _visualization_config() -> dict:
     config = current_app.config.get("USE_CASE_CONFIG", {})
     return config.get("visualizations", {})
@@ -1181,7 +1216,12 @@ def _assign_global_category_colors(
 ) -> dict[str, str]:
     palette = _chart_color_palette()
     if not palette:
-        return {}
+        palette = list(DEFAULT_CHART_COLOR_PALETTE)
+
+    if not palette:
+        palette = ["#808080"]
+
+    overrides = _load_visualization_color_overrides()
 
     frequency: dict[str, int] = {}
     first_seen: dict[str, int] = {}
@@ -1204,8 +1244,19 @@ def _assign_global_category_colors(
 
     color_map: dict[str, str] = {}
     palette_size = len(palette)
-    for index, label in enumerate(sorted_labels):
-        color_map[label] = palette[index % palette_size]
+    if palette_size == 0:
+        palette = ["#808080"]
+        palette_size = 1
+
+    palette_index = 0
+    for label in sorted_labels:
+        override_color = overrides.get(label)
+        if override_color:
+            color_map[label] = override_color
+            continue
+
+        color_map[label] = palette[palette_index % palette_size]
+        palette_index += 1
 
     return color_map
 
