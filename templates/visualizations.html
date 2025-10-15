@@ -21,24 +21,36 @@
           {% for filter in filters %}
             <div class="filter-field">
               {% if filter.type == 'select' %}
-                <label for="{{ filter.param }}">{{ filter.label }}</label>
-              {% else %}
-                <label>{{ filter.label }}</label>
-              {% endif %}
-              {% if filter.type == 'select' %}
-                <select
-                  id="{{ filter.param }}"
-                  name="{{ filter.param }}"
-                  multiple
-                  class="filter-multiselect"
-                  aria-describedby="{{ filter.param }}-help"
+                <details
+                  class="filter-dropdown"
+                  data-default-label="{{ filter.empty_label }}"
                 >
-                  {% for option in filter.options %}
-                    <option value="{{ option.value }}" {% if option.value in filter['values'] %}selected{% endif %}>{{ option.label }}</option>
-                  {% endfor %}
-                </select>
-                <small id="{{ filter.param }}-help" class="muted">{{ filter.help_text }}</small>
+                  <summary>
+                    <span class="filter-summary">
+                      <span class="filter-summary-label">{{ filter.label }}</span>
+                      <span class="filter-summary-value">{{ filter.summary }}</span>
+                    </span>
+                    <span class="filter-summary-icon" aria-hidden="true"></span>
+                  </summary>
+                  <div class="filter-dropdown-options" role="group" aria-label="{{ filter.label }}">
+                    {% for option in filter.options %}
+                      <label class="filter-option">
+                        <input
+                          type="checkbox"
+                          name="{{ filter.param }}"
+                          value="{{ option.value }}"
+                          {% if option.value in filter['values'] %}checked{% endif %}
+                          data-label="{{ option.label }}"
+                        >
+                        <span>{{ option.label }}</span>
+                      </label>
+                    {% endfor %}
+                    <button type="button" class="filter-clear" data-clear="true">Clear selection</button>
+                  </div>
+                </details>
+                <small class="muted">{{ filter.help_text }}</small>
               {% elif filter.type == 'range' %}
+                <span class="filter-range-label">{{ filter.label }}</span>
                 <div class="filter-range-inputs">
                   <input
                     type="number"
@@ -100,6 +112,54 @@
 
 {% block scripts %}
   {{ super() }}
+  <script>
+    (function () {
+      const dropdowns = document.querySelectorAll('.filter-dropdown');
+      dropdowns.forEach((dropdown) => {
+        const summaryValue = dropdown.querySelector('.filter-summary-value');
+        const defaultLabel = dropdown.dataset.defaultLabel || 'All';
+        const checkboxes = Array.from(
+          dropdown.querySelectorAll('input[type="checkbox"]')
+        );
+        const clearButton = dropdown.querySelector('[data-clear]');
+
+        const formatSummary = (labels) => {
+          if (!labels.length) {
+            return defaultLabel;
+          }
+          if (labels.length === 1) {
+            return labels[0];
+          }
+          if (labels.length === 2) {
+            return labels.join(', ');
+          }
+          return `${labels[0]}, ${labels[1]} +${labels.length - 2} more`;
+        };
+
+        const updateSummary = () => {
+          const labels = checkboxes
+            .filter((input) => input.checked)
+            .map((input) => input.dataset.label || input.value);
+          summaryValue.textContent = formatSummary(labels);
+        };
+
+        checkboxes.forEach((input) => {
+          input.addEventListener('change', updateSummary);
+        });
+
+        if (clearButton) {
+          clearButton.addEventListener('click', () => {
+            checkboxes.forEach((input) => {
+              input.checked = false;
+            });
+            updateSummary();
+          });
+        }
+
+        updateSummary();
+      });
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     const charts = {{ graphs | tojson }};
