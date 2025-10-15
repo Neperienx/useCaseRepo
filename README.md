@@ -168,6 +168,50 @@ Because the configuration drives the UI, changes here update the application
 without modifying templates. For example, renaming the `synergy` label will
 automatically update the form field and detail view headings.
 
+### Customising dashboard visualisations
+
+Charts and filters on the **Data visualisations** page are defined in the
+`"visualizations"` section of [`use_case_config.json`](./use_case_config.json).
+It contains three parts:
+
+- `color_palette`: optional hex colours reused by charts (falls back to a
+  built-in palette when omitted).
+- `filters`: controls the dropdowns and range inputs rendered above the charts.
+- `graphs`: the list of visualisations available to users. Each entry becomes a
+  Chart.js configuration at runtime.
+
+#### Adding a new chart
+
+1. Decide which model attribute should drive the grouping. For example, the
+   built-in *Synergy coverage by sector* donut counts `synergy` entries per
+   `industry` value.
+2. Create a new object inside the `"graphs"` array with at least these keys:
+   - `id`: unique identifier used to generate the `<canvas>` element ID.
+   - `title`/`description`: text displayed above and below the chart.
+   - `type`: one of `"bar"`, `"donut"`/`"doughnut"`, or `"pie"`.
+   - `group_by`: the model field whose values become the chart labels.
+   - `metric`: controls how values are calculated. Use `{"operation": "count"}`
+     to count records, or `{"operation": "sum", "field": "impact"}` to sum a
+     numeric column. The optional `label` customises the dataset legend.
+   - `allowed_roles`: restricts visibility to the listed roles.
+   - `missing_label`: fallback label for empty or `NULL` values.
+3. (Optional) Add `chart_options` to pass additional Chart.js settings such as
+   axis tweaks for bar charts.
+4. Save the file and refresh the browser. The Flask app hot-reloads the
+   configuration without requiring a restart.
+
+#### Filtering and splitting grouped values
+
+- `row_filters`: array of conditions applied before aggregating data. Each
+  filter requires a `field` and an `operator`. Supported operators are
+  `not_empty`, `equals`, `not_equals`, `in`, and `not_in`. For example, the
+  synergy charts filter out records where the `synergy` column is blank so the
+  donut only counts meaningful entries.
+- `group_value_separator`: when set (for example to `","`), string values in
+  the `group_by` field are split into multiple labels. This is handy for comma-
+  separated tags—each tag receives its own slice while the chart still honours
+  the configured metric.
+
 #### Changing an existing mapping
 
 1. Update your spreadsheet header to the new name.
