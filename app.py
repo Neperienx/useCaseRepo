@@ -858,12 +858,26 @@ def _visualization_payload_for_user(
 
     if use_cases is None:
         use_cases = UseCase.query.all()
+
     used_ids: set[str] = set()
     prepared: list[dict] = []
+    aggregations: list[tuple[int, dict, dict]] = []
+
     for index, config in enumerate(configs, start=1):
-        payload = _build_visualization_graph(config, use_cases, used_ids, index)
-        if payload is not None:
-            prepared.append(payload)
+        aggregation = _aggregate_graph_values(config, use_cases)
+        if aggregation is None:
+            continue
+        aggregations.append((index, config, aggregation))
+
+    color_map = _assign_global_category_colors(aggregations)
+
+    for index, config, aggregation in aggregations:
+        prepared.append(
+            _build_visualization_graph(
+                config, aggregation, used_ids, index, color_map
+            )
+        )
+
     return prepared
 
 
@@ -993,16 +1007,16 @@ def _prepare_visualization_filters(
 
 
 def _build_visualization_graph(
-    config: dict, use_cases: list[UseCase], used_ids: set[str], index: int
-) -> dict | None:
-    aggregation = _aggregate_graph_values(config, use_cases)
-    if aggregation is None:
-        return None
-
+    config: dict,
+    aggregation: dict,
+    used_ids: set[str],
+    index: int,
+    color_map: dict[str, str],
+) -> dict:
     labels = aggregation["labels"]
     values = aggregation["values"]
     chart_type = _normalise_chart_type(config.get("type"))
-    colors = _chart_colors(len(labels))
+    colors = [_resolve_category_color(label, color_map) for label in labels]
     dataset = {
         "label": aggregation["dataset_label"],
         "data": values,
@@ -1162,14 +1176,51 @@ def _aggregate_graph_values(
     return {"labels": labels, "values": values, "dataset_label": dataset_label}
 
 
-def _chart_colors(count: int) -> list[str]:
-    if count <= 0:
-        return []
-    palette_config = _chart_color_palette()
-    palette = []
-    for index in range(count):
-        palette.append(palette_config[index % len(palette_config)])
-    return palette
+def _assign_global_category_colors(
+    graphs: list[tuple[int, dict, dict]]
+) -> dict[str, str]:
+    palette = _chart_color_palette()
+    if not palette:
+        return {}
+
+    frequency: dict[str, int] = {}
+    first_seen: dict[str, int] = {}
+    order = 0
+
+    for _, _, aggregation in graphs:
+        for label in aggregation.get("labels", []):
+            frequency[label] = frequency.get(label, 0) + 1
+            if label not in first_seen:
+                first_seen[label] = order
+                order += 1
+
+    if not frequency:
+        return {}
+
+    sorted_labels = sorted(
+        frequency,
+        key=lambda label: (-frequency[label], first_seen[label]),
+    )
+
+    color_map: dict[str, str] = {}
+    palette_size = len(palette)
+    for index, label in enumerate(sorted_labels):
+        color_map[label] = palette[index % palette_size]
+
+    return color_map
+
+
+def _resolve_category_color(label: str, color_map: dict[str, str]) -> str:
+    color = color_map.get(label)
+    if color:
+        return color
+
+    palette = _chart_color_palette()
+    if not palette:
+        return "#808080"
+
+    fallback_index = abs(hash(label)) % len(palette)
+    return palette[fallback_index]
 
 
 def _normalise_chart_type(chart_type: str | None) -> str:
