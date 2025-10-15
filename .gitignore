@@ -13,3 +13,7 @@ env/
 # Optional: ignore IDE / editor settings (common ones)
 .vscode/
 .idea/
+
+
+.visualization_color*
+visualization_color*
