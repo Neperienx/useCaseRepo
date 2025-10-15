@@ -157,14 +157,15 @@
     ],
     "graphs": [
       {
-        "id": "use-cases-by-sector",
-        "title": "Use cases by business sector",
-        "description": "Count of use cases per business sector.",
+        "id": "business-value-by-rollout-stage",
+        "title": "Business value by roll out stage",
+        "description": "Sum of estimated business value grouped by roll out stage.",
         "type": "donut",
-        "group_by": "industry",
+        "group_by": "data_source",
         "metric": {
-          "operation": "count",
-          "label": "Use case count"
+          "operation": "sum",
+          "field": "impact",
+          "label": "Business value"
         },
         "allowed_roles": [
           "admin",
@@ -173,72 +174,10 @@
         "missing_label": "Not specified"
       },
       {
-        "id": "synergy-by-sector",
-        "title": "Synergy coverage by sector",
-        "description": "How many recorded synergies exist for each business sector.",
+        "id": "business-value-by-sector",
+        "title": "Business value by business sector",
+        "description": "Sum of estimated business value grouped by business sector.",
         "type": "donut",
-        "group_by": "industry",
-        "metric": {
-          "operation": "count",
-          "label": "Use cases with synergy"
-        },
-        "allowed_roles": [
-          "admin",
-          "reader"
-        ],
-        "missing_label": "Not specified",
-        "row_filters": [
-          {"field": "synergy", "operator": "not_empty"}
-        ]
-      },
-      {
-        "id": "synergy-by-domain",
-        "title": "Synergy coverage by domain",
-        "description": "Distribution of synergies across the tagged domains.",
-        "type": "donut",
-        "group_by": "tags",
-        "group_value_separator": ",",
-        "metric": {
-          "operation": "count",
-          "label": "Use cases with synergy"
-        },
-        "allowed_roles": [
-          "admin",
-          "reader"
-        ],
-        "missing_label": "Not specified",
-        "row_filters": [
-          {"field": "synergy", "operator": "not_empty"}
-        ]
-      },
-      {
-        "id": "use-cases-by-benefit-type",
-        "title": "Use cases by business benefit type",
-        "description": "How many initiatives sit in each business benefit classification.",
-        "type": "bar",
-        "group_by": "status_color",
-        "metric": {
-          "operation": "count",
-          "label": "Use case count"
-        },
-        "allowed_roles": [
-          "admin",
-          "reader"
-        ],
-        "missing_label": "Not specified",
-        "chart_options": {
-          "scales": {
-            "y": {
-              "beginAtZero": true
-            }
-          }
-        }
-      },
-      {
-        "id": "benefit-by-sector",
-        "title": "Business value by sector",
-        "description": "Sum of estimated business value, grouped by business sector.",
-        "type": "bar",
         "group_by": "industry",
         "metric": {
           "operation": "sum",
@@ -246,7 +185,60 @@
           "label": "Business value"
         },
         "allowed_roles": [
-          "admin"
+          "admin",
+          "reader"
+        ],
+        "missing_label": "Not specified"
+      },
+      {
+        "id": "business-value-by-domain",
+        "title": "Business value by domain",
+        "description": "Sum of estimated business value across the tagged domains.",
+        "type": "donut",
+        "group_by": "tags",
+        "group_value_separator": ",",
+        "metric": {
+          "operation": "sum",
+          "field": "impact",
+          "label": "Business value"
+        },
+        "allowed_roles": [
+          "admin",
+          "reader"
+        ],
+        "missing_label": "Not specified"
+      },
+      {
+        "id": "business-value-by-synergy",
+        "title": "Business value by synergy",
+        "description": "Sum of estimated business value grouped by synergy classification.",
+        "type": "donut",
+        "group_by": "synergy",
+        "metric": {
+          "operation": "sum",
+          "field": "impact",
+          "label": "Business value"
+        },
+        "allowed_roles": [
+          "admin",
+          "reader"
+        ],
+        "missing_label": "Not specified"
+      },
+      {
+        "id": "business-value-by-benefit-type",
+        "title": "Business value by benefit type",
+        "description": "Sum of estimated business value for each business benefit classification.",
+        "type": "bar",
+        "group_by": "status_color",
+        "metric": {
+          "operation": "sum",
+          "field": "impact",
+          "label": "Business value"
+        },
+        "allowed_roles": [
+          "admin",
+          "reader"
         ],
         "missing_label": "Not specified",
         "chart_options": {
