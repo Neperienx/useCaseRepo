@@ -125,62 +125,77 @@ again the next time you work on the project.
 
 ## 📄 Spreadsheet format
 
-When importing from Excel the following columns are recognised:
+By default the importer expects the columns defined in
+[`use_case_config.json`](./use_case_config.json).【F:use_case_config.json†L1-L70】
+The table below summarises the stock configuration:
 
-| Column name | Purpose |
-| ----------- | ------- |
-| `Title` | Required. Becomes the record title. |
-| `Summary` | Short description shown in the dashboard cards. |
-| `Domain` | Optional label rendered as a pill. |
-| `Problem`, `Solution`, `Impact` | Rendered on the detail page. |
-| `Tags` | Comma separated list of tags for quick filtering. |
-| `Data Source` | Track where the information came from. |
+| Model field | Spreadsheet column | Purpose |
+| ----------- | ------------------ | ------- |
+| `title` | `Use Case Name` | Required. Displayed as the card and detail page title. |
+| `industry` | `Business Sector` | Optional business domain badge. |
+| `summary` | `Description` | Short teaser for the dashboard cards. |
+| `synergy` | `Synergy` | Captures collaboration or alignment notes introduced in this update. |
+| `problem` | `ProblemStatement` | Challenge the use case aims to solve. |
+| `solution` | `SolutionDescription` | Approach or technology used. |
+| `impact` | `Business Value Estimate (Numerical)` | Numeric or textual impact statement. |
+| `data_source` | `Source Stage` | Where the information originated. |
+| `status_color` | `New Type of Business Benefit` | Used for status chips in the UI. |
+| `tags` | `New Domain Mapping for G Level` | Comma-separated tags for filtering. |
 
-Additional columns are ignored but preserved in the uploaded file stored inside
-`instance/uploads/` for reference.
+Columns not referenced in the configuration are ignored during import, but the
+uploaded spreadsheet is preserved under `instance/uploads/` for auditing.
 
-### Customising the importer
+### Customising the importer and field metadata
 
-The spreadsheet importer is configuration-driven. All column mappings live in
-[`use_case_config.json`](./use_case_config.json) under the top-level
-`"import"` key. Each entry maps a model field (for example `industry`) to the
-expected spreadsheet column header via a `"column"` value and optionally
-declares a fallback `"default"` when the column is missing.【F:use_case_config.json†L1-L34】
-You can also supply a user-facing `"label"` that the UI will reuse for
-form inputs and filters.
+The `use_case_config.json` file controls both the importer and the labels you
+see in the UI. Its top-level `"import"` section contains two important keys:
 
-#### Changing a column header (e.g. `Industry` → `Domain`)
+- `"default_missing_value"`: the fallback used when a column is missing and no
+  field-specific default is supplied.
+- `"fields"`: a dictionary keyed by model attribute (`title`, `synergy`, …)
+  that configures how each attribute is handled.
 
-1. Update the spreadsheet header from **Industry** to **Domain**.
-2. Edit the `industry` mapping in `use_case_config.json` so the `"column"`
-   attribute reads `"Domain"`. Set the optional `"label"` to control how the
-   field is named across the UI.
+Each field entry can define the following properties:
 
-The database column remains `industry`, so no schema changes are required and no
-template or form tweaks are necessary.
+| Property | Meaning |
+| -------- | ------- |
+| `column` | Name of the spreadsheet header to read. Leave it out to skip import for that field. |
+| `required` | When `true`, rows missing a value will fall back to the global or field default to keep imports consistent. |
+| `default` | Value used if the column is absent or the cell is empty. Overrides `default_missing_value` for that field. |
+| `label` | Friendly name reused for form labels, table headings and filters. |
 
-#### Adding a new column (e.g. `Type of benefits`)
+Because the configuration drives the UI, changes here update the application
+without modifying templates. For example, renaming the `synergy` label will
+automatically update the form field and detail view headings.
 
-1. Add a new field to the `UseCase` model in `app.py` (for example
-   `benefit_type = db.Column(db.String(120))`).【F:app.py†L150-L210】
-   Recreate the SQLite database with `flask --app app init-db` if you are not
-   using migrations.
-2. Expose the field in `UseCaseForm` so it can be edited through the UI and
-   display it where appropriate in the templates.
-3. Extend `use_case_config.json` with a new mapping. For instance:
+#### Changing an existing mapping
 
-   ```json
-   "benefit_type": {
-     "column": "Type of benefits",
-     "default": "Undefined"
-   }
-   ```
+1. Update your spreadsheet header to the new name.
+2. Edit the corresponding entry under `"fields"` so its `"column"` value matches
+   the new header. Adjust `"label"` if you want the UI text to change as well.
 
-4. Add the new column to your spreadsheet and populate the values before
-   importing.
+No database changes are required because the underlying SQL column keeps the
+same name.
 
-The importer automatically picks up any fields defined in the configuration
-file, so no changes to the import logic are necessary once the mapping exists.
+#### Removing a field from imports
+
+Delete the field entry from the `"fields"` dictionary. The importer will stop
+looking for that column and will no longer populate the associated model
+attribute. If you also want the field gone from the UI, remove or hide the
+corresponding form field and template snippets in `app.py` and `templates/`.
+
+#### Adding a new field
+
+1. Create a new column on the `UseCase` model in `app.py` (for example,
+   `benefit_type = db.Column(db.String(120))`).【F:app.py†L140-L211】
+   Run `flask --app app init-db` to rebuild the SQLite database when working
+   locally without migrations.
+2. Add matching inputs to `UseCaseForm` and render them where appropriate in the
+   templates so the field is editable.
+3. Extend the configuration with a new mapping, including a `column` that matches
+   your spreadsheet header, an optional `default`, and a `label` for the UI.
+4. Populate the new column in your spreadsheet and import it—the importer will
+   pick up the field automatically once it appears in the configuration.
 
 ---
 

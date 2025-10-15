@@ -47,8 +47,8 @@
             {% else %}
               <h3><span class="muted">Restricted use case</span></h3>
             {% endif %}
-            {% if can_view_field(item, "requestor") and item.requestor %}
-              <p class="muted small"><strong>{{ field_labels.get('requestor', 'Requestor') }}:</strong> {{ item.requestor }}</p>
+            {% if can_view_field(item, "synergy") and item.synergy %}
+              <p class="muted small"><strong>{{ field_labels.get('synergy', 'Synergy') }}:</strong> {{ item.synergy|truncate(120) }}</p>
             {% endif %}
           </header>
           {% if can_view_field(item, "summary") and item.summary %}
