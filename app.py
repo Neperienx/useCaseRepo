@@ -1072,13 +1072,14 @@ def _aggregate_graph_values(
     operation = (metric.get("operation") or "count").lower()
     field = metric.get("field")
     default_label = config.get("missing_label", "Undefined")
+    row_filters = config.get("row_filters") or []
 
     totals: dict[str, float] = {}
     for use_case in use_cases:
+        if not _row_passes_filters(use_case, row_filters):
+            continue
         raw_label = getattr(use_case, group_by, None)
-        if isinstance(raw_label, str):
-            raw_label = raw_label.strip()
-        label = str(raw_label) if raw_label else default_label
+        labels = _extract_group_labels(raw_label, default_label, config)
 
         if operation == "sum":
             if not field:
@@ -1087,7 +1088,8 @@ def _aggregate_graph_values(
         else:
             value = 1
 
-        totals[label] = totals.get(label, 0) + value
+        for label in labels:
+            totals[label] = totals.get(label, 0) + value
 
     labels = list(totals.keys())
     values = list(totals.values())
@@ -1158,6 +1160,82 @@ def _coerce_to_number(value) -> float:
         return float(normalised)
     except ValueError:
         return 0.0
+
+
+def _row_passes_filters(use_case: UseCase, filters: list[dict]) -> bool:
+    if not filters:
+        return True
+
+    for filter_config in filters:
+        field = filter_config.get("field")
+        if not field:
+            continue
+
+        operator = (filter_config.get("operator") or "equals").lower()
+        raw_value = getattr(use_case, field, None)
+
+        if operator == "not_empty":
+            if raw_value is None:
+                return False
+            if isinstance(raw_value, str) and not raw_value.strip():
+                return False
+        elif operator == "equals":
+            if raw_value != filter_config.get("value"):
+                return False
+        elif operator == "not_equals":
+            if raw_value == filter_config.get("value"):
+                return False
+        elif operator == "in":
+            values = filter_config.get("values")
+            if values is None:
+                return False
+            normalised_values = {_normalise_filter_candidate(value) for value in values}
+            if _normalise_filter_candidate(raw_value) not in normalised_values:
+                return False
+        elif operator == "not_in":
+            values = filter_config.get("values")
+            if values is None:
+                continue
+            normalised_values = {_normalise_filter_candidate(value) for value in values}
+            if _normalise_filter_candidate(raw_value) in normalised_values:
+                return False
+        else:
+            expected = filter_config.get("value")
+            if expected is not None and raw_value != expected:
+                return False
+
+    return True
+
+
+def _extract_group_labels(raw_value, default_label: str, config: dict) -> list[str]:
+    separator = config.get("group_value_separator")
+
+    if separator and isinstance(raw_value, str):
+        parts = [part.strip() for part in raw_value.split(separator)]
+        cleaned = [part for part in parts if part]
+        if cleaned:
+            return [str(part) for part in cleaned]
+        return [default_label]
+
+    if isinstance(raw_value, str):
+        text = raw_value.strip()
+        if text:
+            return [text]
+        return [default_label]
+
+    if raw_value is None:
+        return [default_label]
+
+    return [str(raw_value)]
+
+
+def _normalise_filter_candidate(value) -> str:
+    if value is None:
+        return "__none__"
+    if isinstance(value, str):
+        text = value.strip()
+        return text or "__empty__"
+    return str(value)
 
 
 def _available_owner_choices(use_case: UseCase) -> list[tuple[int, str]]:
