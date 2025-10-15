@@ -901,6 +901,20 @@ def _prepare_visualization_filters(
                         getattr(use_case, field, None), selected_values, config
                     )
                 ]
+            selected_labels = [
+                next(
+                    (
+                        option["label"]
+                        for option in options
+                        if option["value"] == value
+                    ),
+                    value,
+                )
+                for value in selected_values
+            ]
+            summary_text = _summarise_filter_selection(
+                selected_labels, config.get("empty_label") or "All"
+            )
             prepared_filters.append(
                 {
                     "id": slug,
@@ -915,6 +929,8 @@ def _prepare_visualization_filters(
                     or max(3, min(len(options), 8)),
                     "help_text": config.get("help_text")
                     or "Leave unselected to include all values.",
+                    "summary": summary_text,
+                    "selected_labels": selected_labels,
                 }
             )
         elif filter_type == "range":
@@ -1030,6 +1046,18 @@ def _build_select_filter_options(
         )
     ]
     return options
+
+
+def _summarise_filter_selection(
+    labels: list[str], default_label: str
+) -> str:
+    if not labels:
+        return default_label
+    if len(labels) == 1:
+        return labels[0]
+    if len(labels) == 2:
+        return ", ".join(labels)
+    return f"{labels[0]}, {labels[1]} +{len(labels) - 2} more"
 
 
 def _filter_option_key(value) -> str:

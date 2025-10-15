@@ -101,7 +101,7 @@
         "allowed_roles": ["admin", "reader"],
         "empty_label": "All sectors",
         "missing_label": "Not specified",
-        "help_text": "Select one or more sectors. Hold Ctrl (Cmd on Mac) to multi-select."
+        "help_text": "Select one or more sectors."
       },
       {
         "id": "benefit-type",
@@ -111,7 +111,7 @@
         "allowed_roles": ["admin", "reader"],
         "empty_label": "All benefit types",
         "missing_label": "Not specified",
-        "help_text": "Select one or more benefit types. Hold Ctrl (Cmd on Mac) to multi-select."
+        "help_text": "Select one or more benefit types."
       },
       {
         "id": "synergy",
@@ -121,7 +121,7 @@
         "allowed_roles": ["admin", "reader"],
         "empty_label": "All synergies",
         "missing_label": "Not specified",
-        "help_text": "Filter by synergy descriptions. Hold Ctrl (Cmd on Mac) to multi-select."
+        "help_text": "Filter by synergy descriptions."
       },
       {
         "id": "domain",
@@ -132,7 +132,7 @@
         "empty_label": "All domains",
         "missing_label": "Not specified",
         "value_separator": ",",
-        "help_text": "Filter by tagged domains. Hold Ctrl (Cmd on Mac) to multi-select."
+        "help_text": "Filter by tagged domains."
       },
       {
         "id": "rollout-stage",
@@ -142,7 +142,7 @@
         "allowed_roles": ["admin", "reader"],
         "empty_label": "All stages",
         "missing_label": "Not specified",
-        "help_text": "Filter by roll out stage. Hold Ctrl (Cmd on Mac) to multi-select."
+        "help_text": "Filter by roll out stage."
       },
       {
         "id": "business-value",
