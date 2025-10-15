@@ -19,9 +19,6 @@
           <span class="tag">{{ use_case.industry }}</span>
         {% endif %}
       </div>
-      {% if can_view_field(use_case, "requestor") and use_case.requestor %}
-        <p class="muted"><strong>{{ field_labels.get('requestor', 'Requestor') }}:</strong> {{ use_case.requestor }}</p>
-      {% endif %}
       {% if can_view_field(use_case, "tags") and use_case.tag_list() %}
         <div class="tag-list">
           {% for tag in use_case.tag_list() %}
@@ -35,6 +32,13 @@
       <section>
         <h2>{{ field_labels.get('summary', 'Summary') }}</h2>
         <p>{{ use_case.summary }}</p>
+      </section>
+    {% endif %}
+
+    {% if can_view_field(use_case, "synergy") and use_case.synergy %}
+      <section>
+        <h2>{{ field_labels.get('synergy', 'Synergy') }}</h2>
+        <p>{{ use_case.synergy }}</p>
       </section>
     {% endif %}
 

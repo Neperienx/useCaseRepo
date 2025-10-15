@@ -12,14 +12,15 @@
         "default": "Not specified",
         "label": "Business sector"
       },
-      "requestor": {
-        "default": "Not specified",
-        "label": "Use case owner / requestor"
-      },
       "summary": {
         "column": "Description",
         "default": "Not specified",
         "label": "Description"
+      },
+      "synergy": {
+        "column": "Synergy",
+        "default": "Not specified",
+        "label": "Synergy"
       },
       "problem": {
         "column": "ProblemStatement",
@@ -64,6 +65,7 @@
         "visible_fields": [
           "title",
           "industry",
+          "synergy",
           "summary",
           "problem",
           "solution",

@@ -146,7 +146,7 @@ class UseCase(db.Model):
     impact = db.Column(db.Text)
     data_source = db.Column(db.String(200))
     tags = db.Column(db.String(200))
-    requestor = db.Column(db.String(200))
+    synergy = db.Column(db.Text)
     status_color = db.Column(db.String(50))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(
@@ -198,15 +198,15 @@ def _ensure_database_schema() -> None:
     inspector = db.session.execute(text("PRAGMA table_info(use_case)")).all()
     existing_columns = {row[1] for row in inspector}
 
-    if "requestor" not in existing_columns:
-        db.session.execute(
-            text("ALTER TABLE use_case ADD COLUMN requestor VARCHAR(200)")
-        )
-        db.session.commit()
-
     if "status_color" not in existing_columns:
         db.session.execute(
             text("ALTER TABLE use_case ADD COLUMN status_color VARCHAR(50)")
+        )
+        db.session.commit()
+
+    if "synergy" not in existing_columns:
+        db.session.execute(
+            text("ALTER TABLE use_case ADD COLUMN synergy TEXT")
         )
         db.session.commit()
 
@@ -225,10 +225,8 @@ class LoginForm(FlaskForm):
 class UseCaseForm(FlaskForm):
     title = StringField("Title", validators=[DataRequired(), Length(max=200)])
     industry = StringField("Industry", validators=[Optional(), Length(max=120)])
-    requestor = StringField(
-        "Use case owner", validators=[Optional(), Length(max=200)]
-    )
     summary = TextAreaField("Summary", validators=[Optional()])
+    synergy = TextAreaField("Synergy", validators=[Optional()])
     problem = TextAreaField("Problem", validators=[Optional()])
     solution = TextAreaField("Solution", validators=[Optional()])
     impact = TextAreaField("Impact", validators=[Optional()])
@@ -392,7 +390,7 @@ def register_routes(app: Flask) -> None:
                     func.lower(UseCase.impact).like(like),
                     func.lower(UseCase.data_source).like(like),
                     func.lower(UseCase.tags).like(like),
-                    func.lower(UseCase.requestor).like(like),
+                    func.lower(UseCase.synergy).like(like),
                     func.lower(UseCase.status_color).like(like),
                 )
             )
@@ -467,12 +465,12 @@ def register_routes(app: Flask) -> None:
                 title=form.title.data,
                 industry=form.industry.data or None,
                 summary=form.summary.data or None,
+                synergy=form.synergy.data or None,
                 problem=form.problem.data or None,
                 solution=form.solution.data or None,
                 impact=form.impact.data or None,
                 data_source=form.data_source.data or None,
                 tags=form.tags.data or None,
-                requestor=form.requestor.data or None,
                 status_color=form.status_color.data or None,
             )
             db.session.add(use_case)
