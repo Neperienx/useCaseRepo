@@ -162,6 +162,7 @@
         "description": "Sum of estimated business value grouped by roll out stage.",
         "type": "donut",
         "group_by": "data_source",
+        "legend_limit": 6,
         "metric": {
           "operation": "sum",
           "field": "impact",
@@ -179,6 +180,7 @@
         "description": "Sum of estimated business value grouped by business sector.",
         "type": "donut",
         "group_by": "industry",
+        "legend_limit": 6,
         "metric": {
           "operation": "sum",
           "field": "impact",
@@ -196,6 +198,7 @@
         "description": "Sum of estimated business value across the tagged domains.",
         "type": "donut",
         "group_by": "tags",
+        "legend_limit": 6,
         "group_value_separator": ",",
         "metric": {
           "operation": "sum",
@@ -214,6 +217,7 @@
         "description": "Sum of estimated business value grouped by synergy classification.",
         "type": "donut",
         "group_by": "synergy",
+        "legend_limit": 6,
         "metric": {
           "operation": "sum",
           "field": "impact",
@@ -231,6 +235,7 @@
         "description": "Sum of estimated business value for each business benefit classification.",
         "type": "bar",
         "group_by": "status_color",
+        "legend_limit": 8,
         "metric": {
           "operation": "sum",
           "field": "impact",

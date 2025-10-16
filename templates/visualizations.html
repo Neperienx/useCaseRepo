@@ -163,39 +163,17 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     const charts = {{ graphs | tojson }};
-    const chartInstances = [];
+    const HEIGHT_BY_TYPE = {
+      bar: 320,
+      doughnut: 360,
+      pie: 360
+    };
 
-    const applyDynamicHeight = (chart, wrapper, config) => {
-      if (!chart || !wrapper || !chart.legend) {
-        return;
+    const resolveChartHeight = (chartType) => {
+      if (!chartType) {
+        return 340;
       }
-
-      const legend = chart.legend;
-      const lineWidths = Array.isArray(legend.lineWidths)
-        ? legend.lineWidths.filter((width) => width > 0)
-        : [];
-      const legendRows = lineWidths.length || 1;
-      const legendFontSize =
-        (legend.options.labels && legend.options.labels.font && legend.options.labels.font.size) ||
-        Chart.defaults.font.size ||
-        12;
-      const legendPadding =
-        (legend.options.labels && legend.options.labels.padding !== undefined)
-          ? legend.options.labels.padding
-          : 10;
-      const rowHeight = legendFontSize + legendPadding + 8;
-      const legendHeight = legendRows * rowHeight;
-
-      const baseWrapperHeight = config.chart_type === 'bar' ? 320 : 360;
-      const targetChartArea = config.chart_type === 'bar' ? 220 : 240;
-      const desiredHeight = Math.max(baseWrapperHeight, targetChartArea + legendHeight + 24);
-
-      const roundedHeight = Math.round(desiredHeight);
-      if (wrapper.dataset.height !== String(roundedHeight)) {
-        wrapper.style.height = `${roundedHeight}px`;
-        wrapper.dataset.height = String(roundedHeight);
-        chart.resize();
-      }
+      return HEIGHT_BY_TYPE[chartType] || 340;
     };
 
     charts.forEach((config) => {
@@ -204,8 +182,8 @@
 
       const wrapper = canvas.closest('.chart-wrapper');
       if (wrapper) {
-        wrapper.style.height = config.chart_type === 'bar' ? '320px' : '360px';
-        wrapper.dataset.height = wrapper.style.height.replace('px', '');
+        const height = resolveChartHeight(config.chart_type);
+        wrapper.style.height = `${height}px`;
       }
 
       const baseOptions = {
@@ -216,34 +194,15 @@
           tooltip: { enabled: true }
         }
       };
-      const options = Object.assign(baseOptions, config.options || {});
-      const originalOnResize = options.onResize;
-      options.onResize = (chart, size) => {
-        if (typeof originalOnResize === 'function') {
-          originalOnResize(chart, size);
-        }
-        applyDynamicHeight(chart, wrapper, config);
-      };
+      const options = Object.assign({}, baseOptions, config.options || {});
 
-      const chart = new Chart(canvas, {
+      new Chart(canvas, {
         type: config.chart_type,
         data: {
           labels: config.labels,
           datasets: [config.dataset]
         },
         options
-      });
-
-      chartInstances.push({ chart, wrapper, config });
-
-      requestAnimationFrame(() => {
-        applyDynamicHeight(chart, wrapper, config);
-      });
-    });
-
-    window.addEventListener('resize', () => {
-      chartInstances.forEach(({ chart, wrapper, config }) => {
-        applyDynamicHeight(chart, wrapper, config);
       });
     });
   </script>

@@ -1179,6 +1179,8 @@ def _aggregate_graph_values(
     row_filters = config.get("row_filters") or []
 
     totals: dict[str, float] = {}
+    first_seen: dict[str, int] = {}
+    appearance_order = 0
     for use_case in use_cases:
         if not _row_passes_filters(use_case, row_filters):
             continue
@@ -1193,10 +1195,47 @@ def _aggregate_graph_values(
             value = 1
 
         for label in labels:
+            if label not in first_seen:
+                first_seen[label] = appearance_order
+                appearance_order += 1
             totals[label] = totals.get(label, 0) + value
 
-    labels = list(totals.keys())
-    values = list(totals.values())
+    items: list[tuple[str, float, int]] = [
+        (label, totals[label], first_seen.get(label, appearance_order))
+        for label in totals
+    ]
+    items.sort(key=lambda item: (-item[1], item[2]))
+
+    legend_limit_raw = config.get("legend_limit")
+    legend_limit: int | None = None
+    if legend_limit_raw is not None:
+        try:
+            parsed_limit = int(legend_limit_raw)
+        except (TypeError, ValueError):
+            parsed_limit = None
+        if parsed_limit and parsed_limit > 0:
+            legend_limit = parsed_limit
+
+    if legend_limit and len(items) > legend_limit:
+        cutoff = max(legend_limit - 1, 0)
+        top_items = items[:cutoff] if cutoff else []
+        remainder = items[cutoff:]
+        other_total = sum(value for _, value, _ in remainder)
+        items = list(top_items)
+        if other_total:
+            existing_index = next(
+                (index for index, (label, _, _) in enumerate(items) if label == "Others"),
+                None,
+            )
+            if existing_index is not None:
+                label, value, seen_order = items[existing_index]
+                items[existing_index] = (label, value + other_total, seen_order)
+            else:
+                items.append(("Others", other_total, appearance_order))
+                appearance_order += 1
+
+    labels = [label for label, _, _ in items]
+    values = [value for _, value, _ in items]
     if operation != "sum":
         values = [int(value) for value in values]
 
@@ -1265,6 +1304,9 @@ def _resolve_category_color(label: str, color_map: dict[str, str]) -> str:
     color = color_map.get(label)
     if color:
         return color
+
+    if label.strip().lower() == "others":
+        return "#d1d5db"
 
     palette = _chart_color_palette()
     if not palette:
